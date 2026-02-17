@@ -1,0 +1,372 @@
+document.addEventListener('DOMContentLoaded', () => {
+    // --- Audio Setup ---
+    const sounds = {
+        changeOption: new Audio('sfx and music/changeoption.mp3'),
+        switchTab: new Audio('sfx and music/switchtab.mp3'),
+        tabLoaded: new Audio('sfx and music/tabloaded.mp3'),
+        back: new Audio('sfx and music/back.mp3'),
+        music: new Audio('sfx and music/pausemenumusic.mp3')
+    };
+
+    // Set volumes
+    Object.values(sounds).forEach(sound => sound.volume = 0.5);
+    sounds.music.loop = true;
+    sounds.music.volume = 0.3;
+
+    // Start music on first interaction (browser policy)
+    document.body.addEventListener('click', () => {
+        if (sounds.music.paused) {
+            sounds.music.play().catch(e => console.log('Audio play failed:', e));
+        }
+    }, { once: true });
+
+    // --- Tab Navigation ---
+    const navItems = document.querySelectorAll('.nav-item');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    function switchTab(tabName) {
+        // Play sound
+        sounds.switchTab.currentTime = 0;
+        sounds.switchTab.play().catch(() => { });
+
+        // Update Nav
+        navItems.forEach(item => {
+            if (item.dataset.tab === tabName) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+
+        // Update Content
+        tabContents.forEach(content => {
+            if (content.id === tabName) {
+                content.classList.add('active');
+                // Trigger map resize if map tab
+                if (tabName === 'map' && map) {
+                    setTimeout(() => map.resize(), 100);
+                }
+            } else {
+                content.classList.remove('active');
+            }
+        });
+    }
+
+    navItems.forEach(item => {
+        item.addEventListener('mouseenter', () => {
+            sounds.changeOption.currentTime = 0;
+            sounds.changeOption.play().catch(() => { });
+        });
+
+        item.addEventListener('click', () => {
+            const tabName = item.dataset.tab;
+            switchTab(tabName);
+        });
+    });
+
+    // --- Geolocation & Live Data ---
+    const clockElement = document.getElementById('real-time-clock');
+
+    // Update Clock
+    function updateClock() {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        if (clockElement) clockElement.textContent = `${hours}:${minutes}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Map Initialization (MapLibre GL JS)
+    const apiKey = 'xZ5mRqiLKIk5P0G37FF9';
+    const mapId = '0196a9ff-ca5a-72a8-b5e3-71deec7a5e00';
+    const styleUrl = `https://api.maptiler.com/maps/${mapId}/style.json?key=${apiKey}`;
+
+    const map = new maplibregl.Map({
+        container: 'map-container',
+        style: styleUrl,
+        center: [-0.09, 51.505], // Default London
+        zoom: 13,
+        attributionControl: false
+    });
+
+    // Add navigation controls (optional, keep minimal for GTA style)
+    // map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+    // Fetch User Location
+    let multiplayerInitialized = false;
+    let playerMarker = null;
+
+    if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(position => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+
+            // Update global userPos for PeerJS heartbeat
+            userPos.lat = lat;
+            userPos.lng = lng;
+
+            if (!playerMarker) {
+                // First time setup
+                const playerMarkerEl = document.createElement('div');
+                playerMarkerEl.className = 'player-blip';
+
+                playerMarker = new maplibregl.Marker({ element: playerMarkerEl })
+                    .setLngLat([lng, lat])
+                    .addTo(map);
+
+                map.flyTo({ center: [lng, lat], zoom: 15, essential: true });
+
+                // Initialize Multiplayer once
+                if (!multiplayerInitialized) {
+                    initMultiplayer(lat, lng);
+                    multiplayerInitialized = true;
+                }
+
+                // Fetch Weather once
+                fetchWeather(lat, lng);
+            } else {
+                // Update existing marker
+                playerMarker.setLngLat([lng, lat]);
+            }
+
+            // Update Coordinates Display
+            const coordText = document.querySelector('.coordinates');
+            if (coordText) {
+                const ns = lat >= 0 ? 'N' : 'S';
+                const ew = lng >= 0 ? 'E' : 'W';
+                coordText.innerText = `${ns} ${Math.abs(lat).toFixed(4)}°  ${ew} ${Math.abs(lng).toFixed(4)}°`;
+            }
+
+            const locName = document.querySelector('.location-name');
+            if (locName) locName.innerText = "Current Location";
+
+        }, error => {
+            console.error("Geolocation error:", error);
+            const locName = document.querySelector('.location-name');
+            if (locName) locName.innerText = "Location Unavailable";
+        }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+    }
+
+    let otherPlayers = {}; // { peerId: { marker, lat, lng } }
+    let connections = []; // Track connections if we are the hub
+    let userPos = { lat: 0, lng: 0 }; // Global tracking
+
+    function initMultiplayer(lat, lng) {
+        userPos.lat = lat;
+        userPos.lng = lng;
+
+        const hubId = 'GTA-V-LOBBY-RECREATION'; // Shared Hub ID
+        let peer = new Peer(); // Random ID for yourself
+
+        peer.on('open', (myId) => {
+            console.log('My Peer ID:', myId);
+
+            // 1. Try to connect to the Hub
+            const connToHub = peer.connect(hubId);
+
+            connToHub.on('open', () => {
+                console.log('Connected to existing Hub');
+                startHeartbeat(connToHub, myId);
+            });
+
+            connToHub.on('error', (err) => {
+                console.log('No Hub found or error. Attempting to become the Hub...');
+                becomeHub();
+            });
+
+            // 2. If connection to Hub fails or closes, try to become Hub
+            setTimeout(() => {
+                if (!connToHub.open) {
+                    becomeHub();
+                }
+            }, 3000);
+        });
+
+        function becomeHub() {
+            const hubPeer = new Peer(hubId);
+
+            hubPeer.on('open', () => {
+                console.log('+++ YOU ARE NOW THE LOBBY HUB +++');
+                hubPeer.on('connection', (conn) => {
+                    connections.push(conn);
+                    conn.on('data', (data) => {
+                        if (data.type === 'POS_UPDATE') {
+                            updateOtherPlayer(data);
+                            // Relay to everyone else
+                            connections.forEach(c => {
+                                if (c.open && c.peer !== data.id) {
+                                    c.send(data);
+                                }
+                            });
+                        }
+                    });
+                    conn.on('close', () => {
+                        connections = connections.filter(c => c !== conn);
+                    });
+                });
+            });
+
+            hubPeer.on('error', (err) => {
+                if (err.type === 'unavailable-id') {
+                    console.log('Hub ID taken, I am a client.');
+                }
+            });
+        }
+
+        function startHeartbeat(conn, myId) {
+            setInterval(() => {
+                if (conn.open) {
+                    conn.send({
+                        type: 'POS_UPDATE',
+                        id: myId,
+                        lat: userPos.lat, // Use global updated pos
+                        lng: userPos.lng,
+                        name: document.querySelector('.username').innerText
+                    });
+                }
+            }, 3000);
+        }
+
+        peer.on('connection', (conn) => {
+            conn.on('data', (data) => {
+                if (data.type === 'POS_UPDATE') {
+                    updateOtherPlayer(data);
+                }
+            });
+        });
+    }
+
+    function updateOtherPlayer(data) {
+        if (otherPlayers[data.id]) {
+            otherPlayers[data.id].marker.setLngLat([data.lng, data.lat]);
+            otherPlayers[data.id].lastUpdate = Date.now();
+        } else {
+            console.log('New player detected:', data.id);
+            const el = document.createElement('div');
+            el.className = 'other-blip';
+
+            const marker = new maplibregl.Marker({ element: el })
+                .setLngLat([data.lng, data.lat])
+                .addTo(map);
+
+            otherPlayers[data.id] = { marker, lastUpdate: Date.now() };
+        }
+    }
+
+    // Cleanup stale blips after 15 seconds
+    setInterval(() => {
+        const now = Date.now();
+        for (let id in otherPlayers) {
+            if (now - otherPlayers[id].lastUpdate > 15000) {
+                otherPlayers[id].marker.remove();
+                delete otherPlayers[id];
+            }
+        }
+    }, 5000);
+
+    // Weather API (Open-Meteo)
+    async function fetchWeather(lat, lng) {
+        try {
+            // Removed temperature_unit=fahrenheit to default to Celsius
+            const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code,is_day&daily=weather_code,temperature_2m_max&timezone=auto`);
+            const data = await response.json();
+
+            updateWeatherUI(data);
+        } catch (error) {
+            console.error("Weather fetch failed:", error);
+        }
+    }
+
+    function updateWeatherUI(data) {
+        const current = data.current;
+        const daily = data.daily;
+
+        const getWeatherInfo = (code, isDay = 1) => {
+            const icons = {
+                0: isDay ? '☀️' : '🌙', 1: isDay ? '🌤️' : '☁️', 2: '⛅', 3: '☁️',
+                45: '🌫️', 48: '🌫️', 51: '🌦️', 61: '🌧️', 71: '❄️', 95: '⛈️'
+            };
+            const desc = {
+                0: 'Clear Sky', 1: 'Mainly Clear', 2: 'Partly Cloudy', 3: 'Overcast',
+                45: 'Foggy', 51: 'Drizzle', 61: 'Rainy', 71: 'Snowy', 95: 'Thunderstorm'
+            };
+            return {
+                icon: icons[code] || '❓',
+                text: desc[code] || 'Unknown'
+            };
+        };
+
+        const currentInfo = getWeatherInfo(current.weather_code, current.is_day);
+
+        // Update Current Weather
+        document.querySelector('.temperature').innerText = `${Math.round(current.temperature_2m)}°C`;
+        document.querySelector('.condition').innerText = currentInfo.text;
+        document.querySelector('.weather-icon').innerText = currentInfo.icon;
+
+        // Update Forecast (Next 3 days)
+        const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+        const forecastContainer = document.querySelector('.forecast-row');
+        forecastContainer.innerHTML = ''; // Clear existing
+
+        for (let i = 1; i <= 3; i++) {
+            const date = new Date(daily.time[i]);
+            const dayName = days[date.getDay()];
+            const maxTemp = Math.round(daily.temperature_2m_max[i]);
+            const code = daily.weather_code[i];
+            const info = getWeatherInfo(code);
+
+            const item = document.createElement('div');
+            item.className = 'forecast-item';
+            item.innerHTML = `
+                <div class="day">${dayName}</div>
+                <div class="icon">${info.icon}</div>
+                <div class="temp">${maxTemp}°C</div>
+            `;
+            forecastContainer.appendChild(item);
+        }
+    }
+
+    // --- Settings Logic ---
+    const usernameInput = document.getElementById('username-input');
+    const pfpInput = document.getElementById('pfp-input');
+    const colorInput = document.getElementById('color-input');
+
+    if (usernameInput) {
+        usernameInput.addEventListener('input', (e) => {
+            document.querySelector('.username').innerText = e.target.value || 'PlayerOne';
+            // Play sound? Maybe annoying on every keystroke
+        });
+    }
+
+    if (colorInput) {
+        colorInput.addEventListener('input', (e) => {
+            document.documentElement.style.setProperty('--accent-color', e.target.value);
+        });
+    }
+
+    if (pfpInput) {
+        pfpInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    document.querySelector('.avatar').src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    // --- Input Sounds ---
+    const inputs = document.querySelectorAll('input, .toggle-switch');
+    inputs.forEach(input => {
+        // Skip text/file inputs for sound to avoid spam
+        if (input.type !== 'text' && input.type !== 'file' && input.type !== 'color') {
+            input.addEventListener('input', () => {
+                sounds.changeOption.currentTime = 0;
+                sounds.changeOption.play().catch(() => { });
+            });
+        }
+    });
+});

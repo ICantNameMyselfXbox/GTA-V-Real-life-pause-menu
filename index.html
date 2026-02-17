@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GTA V Pause Menu</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Oswald:wght@400;500;700&display=swap"
+        rel="stylesheet">
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="pause-menu-container">
+        <header class="menu-header">
+            <div class="header-top-bar">
+                <div class="logo">PAUSE</div>
+                <div class="user-info">
+                    <span id="real-time-clock" class="clock-display">00:00</span>
+                    <span class="username">PlayerOne</span>
+                    <img src="https://ui-avatars.com/api/?name=P+1&background=random&color=fff" alt="Avatar"
+                        class="avatar">
+                </div>
+            </div>
+            <nav class="menu-nav">
+                <ul class="nav-list">
+                    <li class="nav-item active" data-tab="map">MAP</li>
+                    <li class="nav-item" data-tab="weather">WEATHER</li>
+                    <li class="nav-item" data-tab="info">INFO</li>
+                    <li class="nav-item" data-tab="settings">SETTINGS</li>
+                </ul>
+            </nav>
+        </header>
+
+        <main class="content-area">
+            <!-- MAP TAB -->
+            <section id="map" class="tab-content active">
+                <div id="map-container"></div>
+                <div class="map-overlay-info">
+                    <div class="location-name">Los Santos</div>
+                    <div class="coordinates">N 34° 11' 22" W 118° 34' 12"</div>
+                </div>
+            </section>
+
+            <!-- WEATHER TAB -->
+            <section id="weather" class="tab-content">
+                <div class="weather-display">
+                    <div class="weather-icon">☀️</div>
+                    <div class="weather-info">
+                        <div class="temperature">72°F</div>
+                        <div class="condition">Sunny</div>
+                    </div>
+                </div>
+                <div class="forecast-row">
+                    <div class="forecast-item">
+                        <div class="day">MON</div>
+                        <div class="icon">☀️</div>
+                        <div class="temp">70°</div>
+                    </div>
+                    <div class="forecast-item">
+                        <div class="day">TUE</div>
+                        <div class="icon">⛅</div>
+                        <div class="temp">68°</div>
+                    </div>
+                    <div class="forecast-item">
+                        <div class="day">WED</div>
+                        <div class="icon">🌧️</div>
+                        <div class="temp">65°</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- INFO TAB -->
+            <section id="info" class="tab-content">
+                <div class="info-grid">
+                    <div class="info-card">
+                        <h3>About</h3>
+                        <div class="stat-value" style="font-size: 1.5rem;">GTA V Pause Menu Recreation</div>
+                        <div style="margin-top: 10px; color: #aaa;">Version 1.2</div>
+                    </div>
+                    <div class="info-card">
+                        <h3>Author</h3>
+                        <div class="stat-value" style="font-size: 1.5rem;">Marcel "M4K0"</div>
+                        <div style="margin-top: 10px; color: #aaa;">Created with love & code &gt;w&lt;</div>
+                    </div>
+                    <div class="info-card">
+                        <h3>Time Played</h3>
+                        <div class="stat-value">42h 15m</div>
+                    </div>
+                    <div class="info-card">
+                        <h3>Wanted Level</h3>
+                        <div class="stars">★★☆☆☆</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SETTINGS TAB -->
+            <section id="settings" class="tab-content">
+                <div class="settings-list">
+                    <div class="setting-item">
+                        <label>Display Name</label>
+                        <input type="text" id="username-input" class="gta-input" placeholder="Enter Name"
+                            value="PlayerOne">
+                    </div>
+                    <div class="setting-item">
+                        <label>Profile Picture</label>
+                        <input type="file" id="pfp-input" class="gta-input" accept="image/*">
+                    </div>
+                    <div class="setting-item">
+                        <label>Accent Color</label>
+                        <input type="color" id="color-input" class="color-picker" value="#3498db">
+                    </div>
+                    <div class="setting-item">
+                        <label>Master Volume</label>
+                        <input type="range" class="gta-slider" min="0" max="100" value="80">
+                    </div>
+                    <div class="setting-item">
+                        <label>Brightness</label>
+                        <input type="range" class="gta-slider" min="0" max="100" value="50">
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="menu-footer">
+            <div class="key-hint"><span class="key">ESC</span> BACK</div>
+            <div class="key-hint"><span class="key">↵</span> SELECT</div>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
