@@ -168,17 +168,37 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let otherPlayers = {}; // { peerId: { marker, lat, lng } }
     let connections = []; // Track connections if we are the hub
+    let currentPeer = null;
     let userPos = { lat: 0, lng: 0 }; // Global tracking
 
     function initMultiplayer(lat, lng) {
         userPos.lat = lat;
         userPos.lng = lng;
 
-        const hubId = 'GTA-V-GLOBAL-LOBBY-M4K0-HUB';
-        let peer = new Peer();
+        const lobbyInput = document.getElementById('lobby-input');
+        const hubId = lobbyInput.value.toUpperCase() || 'GTA-GLOBAL-LOBBY';
+
+        const statusEl = document.querySelector('.connection-status');
+        if (statusEl) statusEl.innerText = "STARTING PEER...";
+
+        // PeerJS Config with STUN servers for NAT traversal
+        const peerConfig = {
+            config: {
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' }
+                ]
+            }
+        };
+
+        if (currentPeer) currentPeer.destroy();
+        let peer = new Peer(peerConfig);
+        currentPeer = peer;
 
         peer.on('open', (myId) => {
             console.log('My Peer ID:', myId);
+            if (statusEl) statusEl.innerText = "CONNECTING...";
             attemptConnect(hubId, myId, peer);
         });
 
@@ -199,6 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
             conn.on('open', () => {
                 clearTimeout(connectionTimeout);
                 console.log('Connected to Lobby Hub');
+                if (statusEl) statusEl.innerText = "CONNECTED";
                 startHeartbeat(conn, myId);
             });
 
@@ -209,7 +230,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function becomeHub() {
-            const hubPeer = new Peer(hubId);
+            if (statusEl) statusEl.innerText = "HOSTING LOBBY";
+            const hubPeer = new Peer(hubId, peerConfig);
 
             hubPeer.on('open', () => {
                 console.log('+++ YOU ARE NOW HOSTING THE HUB +++');
@@ -217,7 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log('Someone joined your map:', conn.peer);
                     connections.push(conn);
 
-                    // Proactive sync: Send existing players and OURSELVES to the newcomer
+                    // Proactive sync
                     for (let id in otherPlayers) {
                         conn.send({
                             type: 'POS_UPDATE',
@@ -227,7 +249,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             name: otherPlayers[id].name
                         });
                     }
-                    // Send hub's own position
                     conn.send({
                         type: 'POS_UPDATE',
                         peerId: hubId,
@@ -239,7 +260,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     conn.on('data', (data) => {
                         if (data.type === 'POS_UPDATE') {
                             updateOtherPlayer(data);
-                            // Relay to everyone else
                             connections.forEach(c => {
                                 if (c.open && c.peer !== data.peerId) {
                                     c.send(data);
@@ -256,6 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
             hubPeer.on('error', (err) => {
                 if (err.type === 'unavailable-id') {
                     console.log('Hub ID taken. Retrying as client...');
+                    if (statusEl) statusEl.innerText = "CONNECTING...";
                     setTimeout(() => attemptConnect(hubId, peer.id, peer), 2000);
                 }
             });
@@ -274,11 +295,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
 
-            sendUpdate(); // Send immediate check-in
+            sendUpdate();
             setInterval(sendUpdate, 3000);
         }
 
-        // Standard listener for incoming relayed data
         peer.on('connection', (conn) => {
             conn.on('data', (data) => {
                 if (data.type === 'POS_UPDATE') {
@@ -398,6 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const settings = {
             username: usernameInput.value,
             accentColor: colorInput.value,
+            lobbyId: document.getElementById('lobby-input').value,
             avatar: document.querySelector('.avatar').src,
             volume: sliders[0].value,
             brightness: sliders[1].value
@@ -420,6 +441,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (colorInput) {
                 colorInput.value = settings.accentColor || '#3498db';
                 document.documentElement.style.setProperty('--accent-color', colorInput.value);
+            }
+
+            // Lobby
+            const lobbyInput = document.getElementById('lobby-input');
+            if (lobbyInput) {
+                lobbyInput.value = settings.lobbyId || 'GTA-GLOBAL-LOBBY';
             }
 
             // Avatar
@@ -462,6 +489,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     saveSettings();
                 };
                 reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    const lobbyInput = document.getElementById('lobby-input');
+    if (lobbyInput) {
+        lobbyInput.addEventListener('change', () => {
+            saveSettings();
+            // Re-init multiplayer if we have coordinates
+            if (userPos.lat !== 0) {
+                initMultiplayer(userPos.lat, userPos.lng);
             }
         });
     }
