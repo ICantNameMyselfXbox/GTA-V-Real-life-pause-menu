@@ -223,6 +223,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 startHeartbeat(conn, myId);
             });
 
+            conn.on('close', () => {
+                console.log('Hub connection closed. Retrying...');
+                if (statusEl) statusEl.innerText = "LINK LOST - RECONNECTING...";
+                setTimeout(() => {
+                    if (currentPeer && !currentPeer.destroyed) {
+                        initMultiplayer(userPos.lat, userPos.lng);
+                    }
+                }, 3000);
+            });
+
             conn.on('error', (err) => {
                 console.log('Hub connect error:', err);
                 becomeHub();
@@ -267,7 +277,9 @@ document.addEventListener('DOMContentLoaded', () => {
                             });
                         }
                     });
+
                     conn.on('close', () => {
+                        console.log('Peer leftlobby');
                         connections = connections.filter(c => c !== conn);
                     });
                 });
@@ -278,7 +290,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log('Hub ID taken. Retrying as client...');
                     if (statusEl) statusEl.innerText = "CONNECTING...";
                     setTimeout(() => attemptConnect(hubId, peer.id, peer), 2000);
+                } else {
+                    console.error("Hub Error:", err);
+                    if (statusEl) statusEl.innerText = "HUB ERROR";
                 }
+            });
+
+            hubPeer.on('disconnected', () => {
+                console.log('Hub peer disconnected from signaling server.');
+                hubPeer.reconnect();
             });
         }
 
