@@ -338,7 +338,6 @@ document.addEventListener('DOMContentLoaded', () => {
         Object.values(sounds).forEach(sound => {
             sound.volume = volume;
         });
-        if (bgMusic) bgMusic.volume = volume;
     }
 
     function applyBrightness(val) {
