@@ -331,17 +331,63 @@ document.addEventListener('DOMContentLoaded', () => {
     const usernameInput = document.getElementById('username-input');
     const pfpInput = document.getElementById('pfp-input');
     const colorInput = document.getElementById('color-input');
+    const sliders = document.querySelectorAll('.gta-slider');
+
+    function saveSettings() {
+        const settings = {
+            username: usernameInput.value,
+            accentColor: colorInput.value,
+            avatar: document.querySelector('.avatar').src,
+            volume: sliders[0].value,
+            brightness: sliders[1].value
+        };
+        localStorage.setItem('gta_pause_settings', JSON.stringify(settings));
+    }
+
+    function loadSettings() {
+        const saved = localStorage.getItem('gta_pause_settings');
+        if (saved) {
+            const settings = JSON.parse(saved);
+
+            // Name
+            if (usernameInput) {
+                usernameInput.value = settings.username || 'PlayerOne';
+                document.querySelector('.username').innerText = usernameInput.value;
+            }
+
+            // Color
+            if (colorInput) {
+                colorInput.value = settings.accentColor || '#3498db';
+                document.documentElement.style.setProperty('--accent-color', colorInput.value);
+            }
+
+            // Avatar
+            if (settings.avatar) {
+                document.querySelector('.avatar').src = settings.avatar;
+            }
+
+            // Sliders
+            if (sliders.length >= 2) {
+                sliders[0].value = settings.volume || 80;
+                sliders[1].value = settings.brightness || 50;
+            }
+        }
+    }
+
+    // Load initial settings
+    loadSettings();
 
     if (usernameInput) {
         usernameInput.addEventListener('input', (e) => {
             document.querySelector('.username').innerText = e.target.value || 'PlayerOne';
-            // Play sound? Maybe annoying on every keystroke
+            saveSettings();
         });
     }
 
     if (colorInput) {
         colorInput.addEventListener('input', (e) => {
             document.documentElement.style.setProperty('--accent-color', e.target.value);
+            saveSettings();
         });
     }
 
@@ -352,16 +398,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 const reader = new FileReader();
                 reader.onload = function (event) {
                     document.querySelector('.avatar').src = event.target.result;
+                    saveSettings();
                 };
                 reader.readAsDataURL(file);
             }
         });
     }
 
+    sliders.forEach(slider => {
+        slider.addEventListener('input', () => {
+            saveSettings();
+        });
+    });
+
     // --- Input Sounds ---
     const inputs = document.querySelectorAll('input, .toggle-switch');
     inputs.forEach(input => {
-        // Skip text/file inputs for sound to avoid spam
         if (input.type !== 'text' && input.type !== 'file' && input.type !== 'color') {
             input.addEventListener('input', () => {
                 sounds.changeOption.currentTime = 0;
