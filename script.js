@@ -333,6 +333,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const colorInput = document.getElementById('color-input');
     const sliders = document.querySelectorAll('.gta-slider');
 
+    function applyVolume(val) {
+        const volume = val / 100;
+        Object.values(sounds).forEach(sound => {
+            sound.volume = volume;
+        });
+        if (bgMusic) bgMusic.volume = volume;
+    }
+
+    function applyBrightness(val) {
+        // Brightness 0-100 maps to filter brightness 0.5 to 1.5
+        const brightness = 0.5 + (val / 100);
+        document.querySelector('.pause-menu-container').style.filter = `brightness(${brightness})`;
+    }
+
     function saveSettings() {
         const settings = {
             username: usernameInput.value,
@@ -368,9 +382,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Sliders
             if (sliders.length >= 2) {
-                sliders[0].value = settings.volume || 80;
-                sliders[1].value = settings.brightness || 50;
+                const vol = settings.volume || 80;
+                const bright = settings.brightness || 50;
+                sliders[0].value = vol;
+                sliders[1].value = bright;
+                applyVolume(vol);
+                applyBrightness(bright);
             }
+        } else {
+            // Apply defaults if no saved settings
+            applyVolume(80);
+            applyBrightness(50);
         }
     }
 
@@ -405,11 +427,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    sliders.forEach(slider => {
-        slider.addEventListener('input', () => {
+    if (sliders.length >= 2) {
+        sliders[0].addEventListener('input', (e) => {
+            applyVolume(e.target.value);
             saveSettings();
         });
-    });
+        sliders[1].addEventListener('input', (e) => {
+            applyBrightness(e.target.value);
+            saveSettings();
+        });
+    }
 
     // --- Input Sounds ---
     const inputs = document.querySelectorAll('input, .toggle-switch');
