@@ -123,8 +123,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     multiplayerInitialized = true;
                 }
 
-                // Fetch Weather once
+                // Initial data fetches
                 fetchWeather(lat, lng);
+                fetchLocationName(lat, lng);
             } else {
                 // Update existing marker
                 playerMarker.setLngLat([lng, lat]);
@@ -138,14 +139,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 coordText.innerText = `${ns} ${Math.abs(lat).toFixed(4)}°  ${ew} ${Math.abs(lng).toFixed(4)}°`;
             }
 
-            const locName = document.querySelector('.location-name');
-            if (locName) locName.innerText = "Current Location";
-
         }, error => {
             console.error("Geolocation error:", error);
             const locName = document.querySelector('.location-name');
             if (locName) locName.innerText = "Location Unavailable";
-        }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+        }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+    }
+
+    async function fetchLocationName(lat, lng) {
+        try {
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`);
+            const data = await response.json();
+            const city = data.address.city || data.address.town || data.address.village || data.address.suburb || "San Andreas";
+
+            const locName = document.querySelector('.location-name');
+            if (locName) locName.innerText = city.toUpperCase();
+        } catch (error) {
+            console.error("Failed to fetch city name:", error);
+            const locName = document.querySelector('.location-name');
+            if (locName) locName.innerText = "CURRENT LOCATION";
+        }
     }
 
     let otherPlayers = {}; // { peerId: { marker, lat, lng } }
@@ -156,46 +169,54 @@ document.addEventListener('DOMContentLoaded', () => {
         userPos.lat = lat;
         userPos.lng = lng;
 
-        const hubId = 'GTA-V-LOBBY-RECREATION'; // Shared Hub ID
-        let peer = new Peer(); // Random ID for yourself
+        const hubId = 'GTA-V-GLOBAL-LOBBY-M4K0-HUB';
+        let peer = new Peer();
 
         peer.on('open', (myId) => {
             console.log('My Peer ID:', myId);
+            attemptConnect(hubId, myId, peer);
+        });
 
-            // 1. Try to connect to the Hub
-            const connToHub = peer.connect(hubId);
-
-            connToHub.on('open', () => {
-                console.log('Connected to existing Hub');
-                startHeartbeat(connToHub, myId);
+        function attemptConnect(targetId, myId, peerRef) {
+            console.log('Attempting to connect to Hub:', targetId);
+            const conn = peerRef.connect(targetId, {
+                reliable: true
             });
 
-            connToHub.on('error', (err) => {
-                console.log('No Hub found or error. Attempting to become the Hub...');
-                becomeHub();
-            });
-
-            // 2. If connection to Hub fails or closes, try to become Hub
-            setTimeout(() => {
-                if (!connToHub.open) {
+            let connectionTimeout = setTimeout(() => {
+                if (!conn.open) {
+                    console.log('Hub connection timed out. Attempting to host...');
+                    conn.close();
                     becomeHub();
                 }
-            }, 3000);
-        });
+            }, 5000);
+
+            conn.on('open', () => {
+                clearTimeout(connectionTimeout);
+                console.log('Connected to Lobby Hub');
+                startHeartbeat(conn, myId);
+            });
+
+            conn.on('error', (err) => {
+                console.log('Hub connect error:', err);
+                becomeHub();
+            });
+        }
 
         function becomeHub() {
             const hubPeer = new Peer(hubId);
 
             hubPeer.on('open', () => {
-                console.log('+++ YOU ARE NOW THE LOBBY HUB +++');
+                console.log('+++ YOU ARE NOW HOSTING THE HUB +++');
                 hubPeer.on('connection', (conn) => {
+                    console.log('Someone joined your map:', conn.peer);
                     connections.push(conn);
                     conn.on('data', (data) => {
                         if (data.type === 'POS_UPDATE') {
                             updateOtherPlayer(data);
                             // Relay to everyone else
                             connections.forEach(c => {
-                                if (c.open && c.peer !== data.id) {
+                                if (c.open && c.peer !== data.peerId) {
                                     c.send(data);
                                 }
                             });
@@ -209,7 +230,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             hubPeer.on('error', (err) => {
                 if (err.type === 'unavailable-id') {
-                    console.log('Hub ID taken, I am a client.');
+                    console.log('Hub ID taken. Retrying as client...');
+                    setTimeout(() => attemptConnect(hubId, peer.id, peer), 2000);
                 }
             });
         }
@@ -219,8 +241,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (conn.open) {
                     conn.send({
                         type: 'POS_UPDATE',
-                        id: myId,
-                        lat: userPos.lat, // Use global updated pos
+                        peerId: myId, // Explicit peerId
+                        lat: userPos.lat,
                         lng: userPos.lng,
                         name: document.querySelector('.username').innerText
                     });
@@ -228,6 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }, 3000);
         }
 
+        // Standard listener for incoming relayed data
         peer.on('connection', (conn) => {
             conn.on('data', (data) => {
                 if (data.type === 'POS_UPDATE') {
@@ -238,11 +261,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateOtherPlayer(data) {
-        if (otherPlayers[data.id]) {
-            otherPlayers[data.id].marker.setLngLat([data.lng, data.lat]);
-            otherPlayers[data.id].lastUpdate = Date.now();
+        const id = data.peerId || data.id;
+        if (otherPlayers[id]) {
+            otherPlayers[id].marker.setLngLat([data.lng, data.lat]);
+            otherPlayers[id].lastUpdate = Date.now();
         } else {
-            console.log('New player detected:', data.id);
+            console.log('New player detected on map:', id);
             const el = document.createElement('div');
             el.className = 'other-blip';
 
@@ -250,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 .setLngLat([data.lng, data.lat])
                 .addTo(map);
 
-            otherPlayers[data.id] = { marker, lastUpdate: Date.now() };
+            otherPlayers[id] = { marker, lastUpdate: Date.now() };
         }
     }
 
