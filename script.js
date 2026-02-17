@@ -148,16 +148,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchLocationName(lat, lng) {
         try {
-            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`);
+            // Nominatim requires a User-Agent or Referer header
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`, {
+                headers: {
+                    'User-Agent': 'GTA-V-Pause-Menu-Recreation'
+                }
+            });
             const data = await response.json();
-            const city = data.address.city || data.address.town || data.address.village || data.address.suburb || "San Andreas";
+            const city = data.address.city || data.address.town || data.address.village || data.address.suburb || data.address.county || "San Andreas";
 
             const locName = document.querySelector('.location-name');
             if (locName) locName.innerText = city.toUpperCase();
         } catch (error) {
             console.error("Failed to fetch city name:", error);
             const locName = document.querySelector('.location-name');
-            if (locName) locName.innerText = "CURRENT LOCATION";
+            if (locName) locName.innerText = "LOS SANTOS";
         }
     }
 
