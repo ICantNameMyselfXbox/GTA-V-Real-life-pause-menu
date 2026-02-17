@@ -216,6 +216,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 hubPeer.on('connection', (conn) => {
                     console.log('Someone joined your map:', conn.peer);
                     connections.push(conn);
+
+                    // Proactive sync: Send existing players and OURSELVES to the newcomer
+                    for (let id in otherPlayers) {
+                        conn.send({
+                            type: 'POS_UPDATE',
+                            peerId: id,
+                            lat: otherPlayers[id].lat,
+                            lng: otherPlayers[id].lng,
+                            name: otherPlayers[id].name
+                        });
+                    }
+                    // Send hub's own position
+                    conn.send({
+                        type: 'POS_UPDATE',
+                        peerId: hubId,
+                        lat: userPos.lat,
+                        lng: userPos.lng,
+                        name: document.querySelector('.username').innerText
+                    });
+
                     conn.on('data', (data) => {
                         if (data.type === 'POS_UPDATE') {
                             updateOtherPlayer(data);
@@ -242,17 +262,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function startHeartbeat(conn, myId) {
-            setInterval(() => {
+            const sendUpdate = () => {
                 if (conn.open) {
                     conn.send({
                         type: 'POS_UPDATE',
-                        peerId: myId, // Explicit peerId
+                        peerId: myId,
                         lat: userPos.lat,
                         lng: userPos.lng,
                         name: document.querySelector('.username').innerText
                     });
                 }
-            }, 3000);
+            };
+
+            sendUpdate(); // Send immediate check-in
+            setInterval(sendUpdate, 3000);
         }
 
         // Standard listener for incoming relayed data
@@ -269,6 +292,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const id = data.peerId || data.id;
         if (otherPlayers[id]) {
             otherPlayers[id].marker.setLngLat([data.lng, data.lat]);
+            otherPlayers[id].lat = data.lat;
+            otherPlayers[id].lng = data.lng;
+            otherPlayers[id].name = data.name;
             otherPlayers[id].lastUpdate = Date.now();
         } else {
             console.log('New player detected on map:', id);
@@ -279,7 +305,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 .setLngLat([data.lng, data.lat])
                 .addTo(map);
 
-            otherPlayers[id] = { marker, lastUpdate: Date.now() };
+            otherPlayers[id] = {
+                marker,
+                lat: data.lat,
+                lng: data.lng,
+                name: data.name,
+                lastUpdate: Date.now()
+            };
         }
     }
 
