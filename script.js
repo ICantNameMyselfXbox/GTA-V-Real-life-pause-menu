@@ -153,88 +153,97 @@ document.addEventListener('DOMContentLoaded', () => {
     let userPos = { lat: 0, lng: 0 }; // Global tracking
 
     function initMultiplayer(lat, lng) {
-        userPos.lat = lat;
-        userPos.lng = lng;
+        try {
+            if (typeof Peer === 'undefined') {
+                console.warn('PeerJS not loaded. Multiplayer disabled.');
+                return;
+            }
+            userPos.lat = lat;
+            userPos.lng = lng;
 
-        const hubId = 'GTA-V-LOBBY-RECREATION'; // Shared Hub ID
-        let peer = new Peer(); // Random ID for yourself
+            const hubId = 'GTA-V-LOBBY-RECREATION'; // Shared Hub ID
+            let peer = new Peer(); // Random ID for yourself
 
-        peer.on('open', (myId) => {
-            console.log('My Peer ID:', myId);
+            peer.on('open', (myId) => {
+                console.log('My Peer ID:', myId);
 
-            // 1. Try to connect to the Hub
-            const connToHub = peer.connect(hubId);
+                // 1. Try to connect to the Hub
+                const connToHub = peer.connect(hubId);
 
-            connToHub.on('open', () => {
-                console.log('Connected to existing Hub');
-                startHeartbeat(connToHub, myId);
-            });
+                connToHub.on('open', () => {
+                    console.log('Connected to existing Hub');
+                    startHeartbeat(connToHub, myId);
+                });
 
-            connToHub.on('error', (err) => {
-                console.log('No Hub found or error. Attempting to become the Hub...');
-                becomeHub();
-            });
-
-            // 2. If connection to Hub fails or closes, try to become Hub
-            setTimeout(() => {
-                if (!connToHub.open) {
+                connToHub.on('error', (err) => {
+                    console.log('No Hub found or error. Attempting to become the Hub...');
                     becomeHub();
-                }
-            }, 3000);
-        });
+                });
 
-        function becomeHub() {
-            const hubPeer = new Peer(hubId);
+                // 2. If connection to Hub fails or closes, try to become Hub
+                setTimeout(() => {
+                    if (!connToHub.open) {
+                        becomeHub();
+                    }
+                }, 3000);
+            });
 
-            hubPeer.on('open', () => {
-                console.log('+++ YOU ARE NOW THE LOBBY HUB +++');
-                hubPeer.on('connection', (conn) => {
-                    connections.push(conn);
-                    conn.on('data', (data) => {
-                        if (data.type === 'POS_UPDATE') {
-                            updateOtherPlayer(data);
-                            // Relay to everyone else
-                            connections.forEach(c => {
-                                if (c.open && c.peer !== data.id) {
-                                    c.send(data);
-                                }
-                            });
-                        }
-                    });
-                    conn.on('close', () => {
-                        connections = connections.filter(c => c !== conn);
+            function becomeHub() {
+                const hubPeer = new Peer(hubId);
+
+                hubPeer.on('open', () => {
+                    console.log('+++ YOU ARE NOW THE LOBBY HUB +++');
+                    hubPeer.on('connection', (conn) => {
+                        connections.push(conn);
+                        conn.on('data', (data) => {
+                            if (data.type === 'POS_UPDATE') {
+                                updateOtherPlayer(data);
+                                // Relay to everyone else
+                                connections.forEach(c => {
+                                    if (c.open && c.peer !== data.id) {
+                                        c.send(data);
+                                    }
+                                });
+                            }
+                        });
+                        conn.on('close', () => {
+                            connections = connections.filter(c => c !== conn);
+                        });
                     });
                 });
-            });
 
-            hubPeer.on('error', (err) => {
-                if (err.type === 'unavailable-id') {
-                    console.log('Hub ID taken, I am a client.');
-                }
+                hubPeer.on('error', (err) => {
+                    if (err.type === 'unavailable-id') {
+                        console.log('Hub ID taken, I am a client.');
+                    }
+                });
+            }
+
+            function startHeartbeat(conn, myId) {
+                setInterval(() => {
+                    if (conn.open) {
+                        const userDisplay = document.querySelector('.username');
+                        conn.send({
+                            type: 'POS_UPDATE',
+                            id: myId,
+                            lat: userPos.lat, // Use global updated pos
+                            lng: userPos.lng,
+                            name: userDisplay ? userDisplay.innerText : 'Anonymous'
+                        });
+                    }
+                }, 3000);
+            }
+
+            peer.on('connection', (conn) => {
+                conn.on('data', (data) => {
+                    if (data.type === 'POS_UPDATE') {
+                        updateOtherPlayer(data);
+                    }
+                });
             });
+        } catch (err) {
+            console.error("Multiplayer init failed:", err);
         }
-
-        function startHeartbeat(conn, myId) {
-            setInterval(() => {
-                if (conn.open) {
-                    conn.send({
-                        type: 'POS_UPDATE',
-                        id: myId,
-                        lat: userPos.lat, // Use global updated pos
-                        lng: userPos.lng,
-                        name: document.querySelector('.username').innerText
-                    });
-                }
-            }, 3000);
-        }
-
-        peer.on('connection', (conn) => {
-            conn.on('data', (data) => {
-                if (data.type === 'POS_UPDATE') {
-                    updateOtherPlayer(data);
-                }
-            });
-        });
     }
 
     function updateOtherPlayer(data) {
@@ -347,49 +356,63 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function saveSettings() {
+        if (!usernameInput || !colorInput || sliders.length < 2) return;
+
+        const avatarEl = document.querySelector('.avatar');
         const settings = {
             username: usernameInput.value,
             accentColor: colorInput.value,
-            avatar: document.querySelector('.avatar').src,
+            avatar: avatarEl ? avatarEl.src : '',
             volume: sliders[0].value,
             brightness: sliders[1].value
         };
-        localStorage.setItem('gta_pause_settings', JSON.stringify(settings));
+        try {
+            localStorage.setItem('gta_pause_settings', JSON.stringify(settings));
+        } catch (e) {
+            console.error("Settings save failed (likely quota limit):", e);
+        }
     }
 
     function loadSettings() {
-        const saved = localStorage.getItem('gta_pause_settings');
-        if (saved) {
-            const settings = JSON.parse(saved);
+        try {
+            const saved = localStorage.getItem('gta_pause_settings');
+            if (saved) {
+                const settings = JSON.parse(saved);
 
-            // Name
-            if (usernameInput) {
-                usernameInput.value = settings.username || 'PlayerOne';
-                document.querySelector('.username').innerText = usernameInput.value;
-            }
+                // Name
+                if (usernameInput) {
+                    usernameInput.value = settings.username || 'PlayerOne';
+                    const userDisplay = document.querySelector('.username');
+                    if (userDisplay) userDisplay.innerText = usernameInput.value;
+                }
 
-            // Color
-            if (colorInput) {
-                colorInput.value = settings.accentColor || '#3498db';
-                document.documentElement.style.setProperty('--accent-color', colorInput.value);
-            }
+                // Color
+                if (colorInput) {
+                    colorInput.value = settings.accentColor || '#3498db';
+                    document.documentElement.style.setProperty('--accent-color', colorInput.value);
+                }
 
-            // Avatar
-            if (settings.avatar) {
-                document.querySelector('.avatar').src = settings.avatar;
-            }
+                // Avatar
+                if (settings.avatar) {
+                    const avatarEl = document.querySelector('.avatar');
+                    if (avatarEl) avatarEl.src = settings.avatar;
+                }
 
-            // Sliders
-            if (sliders.length >= 2) {
-                const vol = settings.volume || 80;
-                const bright = settings.brightness || 50;
-                sliders[0].value = vol;
-                sliders[1].value = bright;
-                applyVolume(vol);
-                applyBrightness(bright);
+                // Sliders
+                if (sliders.length >= 2) {
+                    const vol = settings.volume !== undefined ? settings.volume : 80;
+                    const bright = settings.brightness !== undefined ? settings.brightness : 50;
+                    sliders[0].value = vol;
+                    sliders[1].value = bright;
+                    applyVolume(vol);
+                    applyBrightness(bright);
+                }
+            } else {
+                applyVolume(80);
+                applyBrightness(50);
             }
-        } else {
-            // Apply defaults if no saved settings
+        } catch (err) {
+            console.error("Failed to load settings:", err);
             applyVolume(80);
             applyBrightness(50);
         }
@@ -400,7 +423,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (usernameInput) {
         usernameInput.addEventListener('input', (e) => {
-            document.querySelector('.username').innerText = e.target.value || 'PlayerOne';
+            const userDisplay = document.querySelector('.username');
+            if (userDisplay) userDisplay.innerText = e.target.value || 'PlayerOne';
             saveSettings();
         });
     }
@@ -418,7 +442,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function (event) {
-                    document.querySelector('.avatar').src = event.target.result;
+                    const avatarEl = document.querySelector('.avatar');
+                    if (avatarEl) avatarEl.src = event.target.result;
                     saveSettings();
                 };
                 reader.readAsDataURL(file);
