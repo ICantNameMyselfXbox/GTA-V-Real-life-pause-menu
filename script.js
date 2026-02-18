@@ -817,6 +817,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     otherPlayers[id].marker.remove();
                 }
                 otherPlayers = {};
+                updatePlayerCount();
 
                 if (peerIdEl) peerIdEl.innerText = hubId;
 
@@ -858,6 +859,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     conn.on('data', (data) => {
                         if (data.type === 'POS_UPDATE') {
                             updateOtherPlayer(data);
+                            updatePlayerCount();
                         }
                     });
 
@@ -867,6 +869,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (otherPlayers[conn.peer]) {
                             otherPlayers[conn.peer].marker.remove();
                             delete otherPlayers[conn.peer];
+                            updatePlayerCount();
                         }
                     });
                 });
@@ -1106,15 +1109,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function saveSettings() {
         const flightToggle = document.getElementById('flight-radar-toggle');
         const storesToggle = document.getElementById('stores-toggle');
+        const blipSlider = document.getElementById('blip-scale-slider');
+
         const settings = {
             username: usernameInput.value,
             accentColor: colorInput.value,
             avatar: document.querySelector('.avatar').src,
-            volume: sliders[0].value,
-            brightness: sliders[1].value,
+            volume: volSlider ? volSlider.value : 80,
             flightRadar: flightToggle ? flightToggle.innerText.includes('On') : true,
             showStores: storesToggle ? storesToggle.innerText.includes('On') : true,
-            blipScale: sliders[2] ? sliders[2].value : 1.0
+            blipScale: blipSlider ? blipSlider.value : 1.0
         };
         localStorage.setItem('gta_pause_settings', JSON.stringify(settings));
     }
@@ -1146,16 +1150,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Sliders
-            if (sliders.length >= 3) {
-                sliders[0].value = settings.volume || 80;
-                sliders[1].value = settings.brightness || 50;
-                sliders[2].value = settings.blipScale || 1.0;
+            const volSlider = document.getElementById('volume-slider');
+            const blipSlider = document.getElementById('blip-scale-slider');
 
+            if (volSlider) {
+                volSlider.value = settings.volume || 80;
+                updateSliderVisuals(volSlider);
+            }
+
+            if (blipSlider) {
+                blipSlider.value = settings.blipScale || 1.0;
                 // Apply scale immediately
-                document.documentElement.style.setProperty('--blip-scale', sliders[2].value);
-
-                // Update visuals for all loaded sliders
-                sliders.forEach(updateSliderVisuals);
+                document.documentElement.style.setProperty('--blip-scale', blipSlider.value);
+                updateSliderVisuals(blipSlider);
             }
 
             // Flight Radar
@@ -1252,12 +1259,19 @@ document.addEventListener('DOMContentLoaded', () => {
         slider.addEventListener('input', () => {
             updateSliderVisuals(slider);
 
-            if (index === 2) { // Blip Scale Slider
+            if (slider.id === 'blip-scale-slider') {
                 const scale = slider.value;
                 document.documentElement.style.setProperty('--blip-scale', scale);
                 // Update Airport Layer (GeoJSON) - scaling 0.7 base
                 if (map && map.getLayer('airports-layer')) {
                     map.setLayoutProperty('airports-layer', 'icon-size', 0.7 * scale);
+                }
+            } else if (slider.id === 'volume-slider') {
+                // Update Global Volume (if applicable)
+                if (sounds) {
+                    Object.values(sounds).forEach(sound => {
+                        sound.volume = slider.value / 100;
+                    });
                 }
             }
             saveSettings();
