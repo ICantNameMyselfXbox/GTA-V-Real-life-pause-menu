@@ -179,15 +179,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const hubId = 'GTA-V-UNIVERSAL-LOBBY-M4K0';
 
         const statusEl = document.querySelector('.connection-status');
+        const peerIdEl = document.getElementById('debug-peer-id');
         if (statusEl) statusEl.innerText = "FINDING SESSION...";
 
-        // PeerJS Config with STUN servers for NAT traversal
+        // PeerJS Config with STUN and TURN servers for Global NAT traversal
+        // Note: Real TURN servers usually require credentials. These are public placeholders.
         const peerConfig = {
+            debug: 1,
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
                     { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' }
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:stun3.l.google.com:19302' },
+                    { urls: 'stun:stun4.l.google.com:19302' }
                 ]
             }
         };
@@ -202,13 +207,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         peer.on('open', (myId) => {
             console.log('My Peer ID:', myId);
+            if (peerIdEl) peerIdEl.innerText = myId;
             if (statusEl) statusEl.innerText = "JOINING GLOBAL LOBBY...";
             attemptConnect(hubId, myId, peer);
         });
 
         function attemptConnect(targetId, myId, peerRef) {
             console.log('Attempting to connect to Global Hub:', targetId);
-            const conn = peerRef.connect(targetId, { reliable: true });
+            const conn = peerRef.connect(targetId, {
+                reliable: true,
+                serialization: 'json'
+            });
 
             let connectionTimeout = setTimeout(() => {
                 if (!conn.open) {
