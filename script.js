@@ -1033,38 +1033,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
         legendList.innerHTML = '';
 
-        // Self entry
+        // Self entry — not clickable, uses Player blip
         const selfName = document.querySelector('.username')?.innerText || 'YOU';
-        const selfAvatar = document.querySelector('.avatar')?.src || '';
         const selfEntry = document.createElement('div');
         selfEntry.className = 'legend-entry';
         selfEntry.innerHTML = `
-            <img class="legend-avatar" src="${selfAvatar}" alt="You"
-                 onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-            <div class="legend-dot self" style="display:none"></div>
-            <span class="legend-name self">${selfName} (YOU)</span>
+            <span class="legend-name self">${selfName}</span>
+            <div class="legend-blip self"></div>
         `;
         legendList.appendChild(selfEntry);
 
-        // Other players
+        // Other players — clickable, fly to their position
         for (let id in otherPlayers) {
             const p = otherPlayers[id];
             const entry = document.createElement('div');
-            entry.className = 'legend-entry';
-            // Generate a deterministic avatar from their name
-            const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name || 'P')}&background=random&color=fff&size=48`;
+            entry.className = 'legend-entry clickable';
+            entry.title = `Center on ${p.name || 'Player'}`;
             entry.innerHTML = `
-                <img class="legend-avatar" src="${avatarUrl}" alt="${p.name || 'Player'}"
-                     onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-                <div class="legend-dot other" style="display:none"></div>
-                <span class="legend-name other">${p.name || 'Unknown'}</span>
+                <span class="legend-name">${p.name || 'Unknown'}</span>
+                <div class="legend-blip other"></div>
             `;
+            entry.addEventListener('click', () => {
+                if (p.lat && p.lng) {
+                    map.flyTo({ center: [p.lng, p.lat], zoom: Math.max(map.getZoom(), 14), essential: true });
+                }
+            });
             legendList.appendChild(entry);
         }
     }
 
     // Initial legend render (just self)
     updateLegend();
+
 
     // Weather API (Open-Meteo)
     async function fetchWeather(lat, lng) {
