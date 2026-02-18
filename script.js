@@ -88,7 +88,13 @@ document.addEventListener('DOMContentLoaded', () => {
         style: styleUrl,
         center: [-0.09, 51.505], // Default London
         zoom: 13,
-        attributionControl: false
+        attributionControl: false,
+        dragPan: true,
+        scrollZoom: true,
+        boxZoom: true,
+        keyboard: true,
+        touchZoomRotate: true,
+        doubleClickZoom: true
     });
 
     map.on('load', () => {
