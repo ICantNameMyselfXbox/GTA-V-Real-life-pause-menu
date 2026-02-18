@@ -473,7 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // OpenSky API is CORS-restricted for direct browser requests.
             // Route through corsproxy.io which adds CORS headers transparently.
             const openskyUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
-            const proxyUrl = `https://proxy.cors.sh/${openskyUrl}`;
+            const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(openskyUrl)}`;
 
             console.log(`[RADAR] Fetching aircraft in bbox: ${lamin},${lomin} → ${lamax},${lomax}`);
             lastFetchTimes.flights = Date.now();
