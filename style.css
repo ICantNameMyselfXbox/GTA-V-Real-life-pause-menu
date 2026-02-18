@@ -276,6 +276,96 @@ body {
     overflow: hidden;
 }
 
+/* ── Flight Blips ─────────────────────────────────────── */
+.plane-blip,
+.heli-blip {
+    width: 0;
+    height: 0;
+    position: relative;
+    pointer-events: none;
+    display: block;
+}
+
+.plane-blip::after,
+.heli-blip::after {
+    content: '';
+    display: block;
+    position: absolute;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0 0 2px black);
+    opacity: 0.9;
+}
+
+/* Default plane icon (fallback) */
+.plane-blip::after {
+    width: var(--current-blip-size);
+    height: var(--current-blip-size);
+    top: calc(var(--current-blip-size) / -2);
+    left: calc(var(--current-blip-size) / -2);
+    background-image: url('Blips/radar_player_plane.png');
+}
+
+.heli-blip::after {
+    width: calc(var(--current-blip-size) * 1.2);
+    height: calc(var(--current-blip-size) * 1.2);
+    top: calc(var(--current-blip-size) * -0.6);
+    left: calc(var(--current-blip-size) * -0.6);
+    background-image: url('Blips/radar_player_heli.gif');
+}
+
+/* Plane variant icons */
+.plane-blip.plane-0::after {
+    background-image: url('Blips/radar_player_plane.png');
+}
+
+.plane-blip.plane-1::after {
+    background-image: url('Blips/radar_player_plane1.png');
+}
+
+.plane-blip.plane-2::after {
+    background-image: url('Blips/radar_player_plane2.png');
+}
+
+.plane-blip.plane-3::after {
+    background-image: url('Blips/radar_player_plane3.png');
+}
+
+.plane-blip.plane-4::after {
+    background-image: url('Blips/radar_player_plane4.png');
+}
+
+.plane-blip.plane-5::after {
+    background-image: url('Blips/radar_player_plane5.png');
+}
+
+.plane-blip.plane-6::after {
+    background-image: url('Blips/radar_player_plane6.png');
+}
+
+.plane-blip.plane-7::after {
+    background-image: url('Blips/radar_player_plane7.png');
+}
+
+.plane-blip.plane-8::after {
+    background-image: url('Blips/radar_player_plane8.png');
+}
+
+.plane-blip.plane-9::after {
+    background-image: url('Blips/radar_player_plane9.png');
+}
+
+.plane-blip.plane-10::after {
+    background-image: url('Blips/radar_player_plane10.png');
+}
+
+.plane-blip.plane-11::after {
+    background-image: url('Blips/radar_player_plane11.png');
+}
+
+
+
 
 .map-overlay-info {
     position: absolute;

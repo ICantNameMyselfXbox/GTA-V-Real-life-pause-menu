@@ -465,49 +465,50 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const lamin = bounds.getSouth();
-            const lomin = bounds.getWest();
-            const lamax = bounds.getNorth();
-            const lomax = bounds.getEast();
+            const lamin = bounds.getSouth().toFixed(4);
+            const lomin = bounds.getWest().toFixed(4);
+            const lamax = bounds.getNorth().toFixed(4);
+            const lomax = bounds.getEast().toFixed(4);
 
-            if (lamin === undefined || lomin === undefined) {
-                scheduleNextFlightFetch(flightCooldown);
-                return;
-            }
+            // OpenSky API is CORS-restricted for direct browser requests.
+            // Route through allorigins.win which adds CORS headers.
+            const openskyUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(openskyUrl)}`;
 
-            const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
-
+            console.log(`[RADAR] Fetching aircraft in bbox: ${lamin},${lomin} → ${lamax},${lomax}`);
             lastFetchTimes.flights = Date.now();
-            const response = await fetch(url);
 
-            if (response.status === 429) {
-                // Exponential backoff: double the cooldown, max 10 minutes
-                flightCooldown = Math.min(flightCooldown * 2, 600000);
-                console.warn(`[RADAR] Rate limited. Next fetch in ${flightCooldown / 1000}s.`);
+            const response = await fetch(proxyUrl);
+
+            if (!response.ok) {
+                console.warn(`[RADAR] Proxy HTTP error: ${response.status}`);
                 scheduleNextFlightFetch(flightCooldown);
                 return;
             }
 
-            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-            const data = await response.json();
-
-            // Success — reset cooldown to base 60s
-            flightCooldown = 60000;
+            const wrapper = await response.json();
+            // allorigins wraps the real response in { contents: "..." }
+            const data = JSON.parse(wrapper.contents);
 
             if (data && data.states) {
-                console.log(`[RADAR] Found ${data.states.length} aircraft in view.`);
+                console.log(`[RADAR] ✈ Found ${data.states.length} aircraft.`);
+                flightCooldown = 60000; // reset on success
                 updateFlightBlips(data.states);
+            } else if (data && data.message && data.message.includes('rate limit')) {
+                flightCooldown = Math.min(flightCooldown * 2, 600000);
+                console.warn(`[RADAR] Rate limited. Next fetch in ${flightCooldown / 1000}s.`);
+                clearFlightBlips();
             } else {
-                console.log("[RADAR] No aircraft detected in this region right now.");
+                console.log('[RADAR] No aircraft in this region.');
                 clearFlightBlips();
             }
         } catch (error) {
-            console.warn("[RADAR] Data fetch failed:", error);
+            console.warn('[RADAR] Fetch failed:', error.message);
         }
 
-        // Schedule next fetch
         scheduleNextFlightFetch(flightCooldown);
     }
+
 
     function updateFlightBlips(states) {
         const seenIds = new Set();
@@ -518,16 +519,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const lat = state[6];
             const track = state[10] || 0;
             const velocity = state[9] || 0;
+            const altitude = state[7]; // can be null for ground vehicles
 
             if (lat && lng) {
                 seenIds.add(id);
-                const isHeli = velocity < 60 && state[7] < 1000;
+                // Null-safe isHeli: on-ground or very slow + low altitude
+                const isHeli = velocity < 60 && (altitude === null || altitude < 1000);
 
                 if (flightMarkers[id]) {
                     flightMarkers[id].marker.setLngLat([lng, lat]);
-                    // BUG 4 FIX: MapLibre Marker has no setRotation(); apply via CSS transform on the element
                     flightMarkers[id].el.style.transform = `rotate(${track}deg)`;
-                    // Update state for prediction
                     flightMarkers[id].lat = lat;
                     flightMarkers[id].lng = lng;
                     flightMarkers[id].velocity = velocity;
@@ -535,8 +536,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     const el = document.createElement('div');
                     el.className = isHeli ? 'heli-blip' : 'plane-blip';
+                    el.style.transform = `rotate(${track}deg)`;
 
-                    // Randomize plane icons via CSS class
                     if (!isHeli) {
                         const rand = Math.floor(Math.random() * 12);
                         el.classList.add(`plane-${rand}`);
@@ -544,27 +545,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const marker = new maplibregl.Marker({
                         element: el,
-                        rotation: track,
                         anchor: 'center',
                         rotationAlignment: 'viewport',
                         pitchAlignment: 'viewport'
+                        // NOTE: do NOT use `rotation` option here — we manage rotation via el.style.transform
                     })
                         .setLngLat([lng, lat])
                         .addTo(map);
 
-                    flightMarkers[id] = {
-                        marker,
-                        el,
-                        lat,
-                        lng,
-                        velocity,
-                        track
-                    };
+                    flightMarkers[id] = { marker, el, lat, lng, velocity, track };
                 }
             }
         });
 
-        // Cleanup
+        // Cleanup stale markers
         for (let id in flightMarkers) {
             if (!seenIds.has(id)) {
                 flightMarkers[id].marker.remove();
@@ -572,6 +566,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }
+
 
     function clearFlightBlips() {
         for (let id in flightMarkers) {
