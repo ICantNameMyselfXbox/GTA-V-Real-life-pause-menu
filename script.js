@@ -308,6 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- FLIGHT RADAR LOGIC (GLOBAL) ---
     let flightCooldown = 60000; // Start at 60s between fetches
     let flightFetchTimer = null;
+    let allAircraftData = null; // Global aircraft cache from adsb.lol /v2/all
 
     function scheduleNextFlightFetch(delay) {
         if (flightFetchTimer) clearTimeout(flightFetchTimer);
@@ -327,9 +328,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Start Predictive Glide Loop (every 100ms)
         setInterval(predictFlights, 250); // Reduced from 100ms to ease CPU load
 
-        // Map move: only refresh airports/stores, NOT flights
+        // Map move: re-filter global aircraft cache to new viewport, refresh stores if stale
         let moveTimeout;
         map.on('moveend', () => {
+            // Instantly re-render aircraft for new viewport from cached global data
+            applyViewportFilter();
             clearTimeout(moveTimeout);
             moveTimeout = setTimeout(() => {
                 const now = Date.now();
@@ -458,19 +461,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Need a user position to do radius-based search
-        if (!userPos || !userPos.lat || !userPos.lng) {
-            scheduleNextFlightFetch(flightCooldown);
-            return;
-        }
-
         try {
-            // adsb.lol (ADS-B Exchange) — has native CORS headers, no proxy needed!
-            // Returns aircraft within `dist` nautical miles of a lat/lon
-            const dist = 250; // nautical miles radius
-            const url = `https://api.adsb.lol/v2/lat/${userPos.lat.toFixed(4)}/lon/${userPos.lng.toFixed(4)}/dist/${dist}`;
-
-            console.log(`[RADAR] Fetching aircraft via adsb.lol (r=${dist}nm around ${userPos.lat.toFixed(3)},${userPos.lng.toFixed(3)})...`);
+            // adsb.lol global endpoint — all aircraft worldwide, native CORS, no proxy needed
+            const url = 'https://api.adsb.lol/v2/all';
+            console.log('[RADAR] Fetching ALL global aircraft via adsb.lol...');
             lastFetchTimes.flights = Date.now();
 
             const response = await fetch(url);
@@ -484,11 +478,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (data && Array.isArray(data.ac)) {
-                console.log(`[RADAR] ✈ Found ${data.ac.length} aircraft.`);
-                flightCooldown = 60000; // reset on success
-                updateFlightBlips(data.ac);
+                console.log(`[RADAR] ✈ Global dataset: ${data.ac.length} aircraft. Filtering to viewport...`);
+                flightCooldown = 60000;
+                // Cache full dataset so map pan/zoom can re-filter without re-fetching
+                allAircraftData = data.ac;
+                applyViewportFilter();
             } else {
-                console.log('[RADAR] No aircraft in range. Response:', data);
+                console.log('[RADAR] Empty response from adsb.lol');
                 clearFlightBlips();
             }
 
@@ -499,26 +495,42 @@ document.addEventListener('DOMContentLoaded', () => {
         scheduleNextFlightFetch(flightCooldown);
     }
 
+    // Filter global cache to current map viewport and update blips
+    function applyViewportFilter() {
+        if (!allAircraftData || !map) return;
+        const bounds = map.getBounds();
+        if (!bounds) return;
+
+        const s = bounds.getSouth(), n = bounds.getNorth();
+        const w = bounds.getWest(), e = bounds.getEast();
+
+        const visible = allAircraftData.filter(ac =>
+            ac.lat && ac.lon &&
+            ac.lat >= s && ac.lat <= n &&
+            ac.lon >= w && ac.lon <= e
+        );
+
+        console.log(`[RADAR] Viewport shows ${visible.length} aircraft.`);
+        updateFlightBlips(visible);
+    }
+
 
     function updateFlightBlips(aircraft) {
         const seenIds = new Set();
 
         aircraft.forEach(ac => {
-            // adsb.lol fields: hex, lat, lon, track, gs (ground speed), alt_baro, category, t (type)
             const id = ac.hex;
             const lat = ac.lat;
             const lng = ac.lon;
             const track = ac.track || 0;
-            const gs = ac.gs || 0;         // ground speed in knots
-            const alt = ac.alt_baro;       // altitude in feet (can be "ground")
-            const category = ac.category || ''; // e.g. "A1"–"A7", "B1"–"B7"
+            const gs = ac.gs || 0;
+            const alt = ac.alt_baro;
+            const category = ac.category || '';
             const typecode = (ac.t || '').toUpperCase();
 
             if (!lat || !lng) return;
-
             seenIds.add(id);
 
-            // Helicopters: category A7, or type starts with H, or very slow + low
             const isHeli = category === 'A7'
                 || typecode.startsWith('H')
                 || (gs < 60 && (alt === 'ground' || (typeof alt === 'number' && alt < 1500)));
@@ -553,7 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Cleanup stale markers
+        // Remove blips that left the viewport
         for (let id in flightMarkers) {
             if (!seenIds.has(id)) {
                 flightMarkers[id].marker.remove();
