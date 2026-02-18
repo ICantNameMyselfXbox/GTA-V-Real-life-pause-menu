@@ -250,10 +250,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let isMultiplayerTransitioning = false; // Guard against refresh loops
 
     // --- SESSION PERSISTENCE (Fixes Ghost Blips) ---
-    let mySessionId = localStorage.getItem('gta_session_id');
+    let mySessionId = sessionStorage.getItem('gta_session_id');
     if (!mySessionId) {
         mySessionId = 'PLAYER-' + Math.random().toString(36).substr(2, 9).toUpperCase();
-        localStorage.setItem('gta_session_id', mySessionId);
+        sessionStorage.setItem('gta_session_id', mySessionId);
     }
     console.log("+++ Session ID Assigned:", mySessionId, "+++");
 
@@ -446,7 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         rotation: track,
                         anchor: 'center',
                         rotationAlignment: 'map',
-                        pitchAlignment: 'map'
+                        pitchAlignment: 'viewport'
                     })
                         .setLngLat([lng, lat])
                         .addTo(map);
@@ -547,7 +547,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         element: markerEl,
                         anchor: 'center',
                         rotationAlignment: 'map',
-                        pitchAlignment: 'map'
+                        pitchAlignment: 'viewport'
                     })
                         .setLngLat([lon, lat])
                         .addTo(map);
@@ -838,11 +838,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Don't draw blips at 0,0
         if (Math.abs(data.lat) < 0.0001 && Math.abs(data.lng) < 0.0001) return;
 
-        // Proximity Guard: If blip is within ~100 meters of us, it's probably a stale version of us
-        // (0.001 degrees is roughly 100 meters)
+        // Proximity Guard: If blip is within ~10 meters of us, it's probably a stale version of us
+        // (0.0001 degrees is roughly 10 meters)
         const latDiff = Math.abs(data.lat - (userPos.lat || 0));
         const lngDiff = Math.abs(data.lng - (userPos.lng || 0));
-        if (latDiff < 0.001 && lngDiff < 0.001) return;
+        if (latDiff < 0.0001 && lngDiff < 0.0001) return;
 
         if (otherPlayers[id]) {
             otherPlayers[id].marker.setLngLat([data.lng, data.lat]);
@@ -893,7 +893,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 element: el,
                 anchor: 'center', // CRITICAL for zoom stability
                 rotationAlignment: 'map',
-                pitchAlignment: 'map'
+                pitchAlignment: 'viewport'
             })
                 .setLngLat([data.lng, data.lat])
                 .addTo(map);
