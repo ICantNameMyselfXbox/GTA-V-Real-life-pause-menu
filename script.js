@@ -772,6 +772,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Receive World State from the Hub
                 conn.on('data', (data) => {
                     if (data.type === 'WORLD_SYNC') {
+                        const incomingIds = new Set(Object.keys(data.players));
+
+                        // Remove players no longer in the world sync
+                        for (let id in otherPlayers) {
+                            if (!incomingIds.has(id) && id !== myPeerId) {
+                                otherPlayers[id].marker.remove();
+                                delete otherPlayers[id];
+                            }
+                        }
+
                         // Batch update all other players from the host's master state
                         for (let id in data.players) {
                             if (id !== myPeerId) {
@@ -784,6 +794,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 });
                             }
                         }
+                        updateLegend();
                     }
                 });
             });
@@ -875,11 +886,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     conn.on('close', () => {
                         connections = connections.filter(c => c !== conn);
-                        // Clean up blip
-                        if (otherPlayers[conn.peer]) {
-                            otherPlayers[conn.peer].marker.remove();
-                            delete otherPlayers[conn.peer];
+                        // Find and remove the blip by matching peerId stored in otherPlayers
+                        for (let id in otherPlayers) {
+                            if (otherPlayers[id].peerId === conn.peer) {
+                                otherPlayers[id].marker.remove();
+                                delete otherPlayers[id];
+                                break;
+                            }
                         }
+                        updateLegend();
+                        console.log('Player disconnected and blip removed:', conn.peer);
                     });
                 });
             });
@@ -1007,6 +1023,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 lng: data.lng,
                 name: data.name,
                 sessionId: data.sessionId,
+                peerId: data.peerId,
                 lastUpdate: Date.now()
             };
         }
