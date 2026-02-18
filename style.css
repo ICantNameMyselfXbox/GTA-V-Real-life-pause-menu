@@ -262,25 +262,32 @@ body {
 
 .player-blip,
 .other-blip {
-    width: 32px;
-    height: 32px;
+    width: 0;
+    height: 0;
     position: relative;
     cursor: pointer;
     pointer-events: auto;
     margin: 0;
     padding: 0;
-    box-sizing: border-box;
     display: block;
     user-select: none;
 }
 
+.player-blip {
+    z-index: 400;
+}
+
+.other-blip {
+    z-index: 500;
+}
+
 /* The actual visual icon */
 .blip-icon {
-    width: 100%;
-    height: 100%;
+    width: 32px;
+    height: 32px;
     position: absolute;
-    top: 0;
-    left: 0;
+    top: -16px;
+    left: -16px;
     background-size: contain;
     background-position: center;
     background-repeat: no-repeat;
@@ -301,8 +308,8 @@ body {
 /* GTA Online Style Name Tags */
 .blip-name-tag {
     position: absolute;
-    left: 36px;
-    /* Offset to the right of the 32px blip */
+    left: 20px;
+    /* Offset from the 0,0 center */
     top: 50%;
     transform: translateY(-50%);
     background: rgba(0, 0, 0, 0.9);
