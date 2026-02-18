@@ -163,7 +163,21 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 // Update existing marker
                 playerMarker.setLngLat([lng, lat]);
+
+                // Track real GPS distance traveled
+                if (typeof turf !== 'undefined' && lastMapPos) {
+                    const from = turf.point([lastMapPos.lng, lastMapPos.lat]);
+                    const to = turf.point([lng, lat]);
+                    const dist = turf.distance(from, to, { units: 'kilometers' });
+                    if (dist > 0.005 && dist < 5) { // ignore tiny GPS jitter (<5m) and huge jumps
+                        stats.distance += dist;
+                        localStorage.setItem('gta_stats_dist', stats.distance);
+                        updateStatsUI();
+                    }
+                }
             }
+            // Always update lastMapPos with current GPS position
+            lastMapPos = { lat, lng };
 
             // Update Coordinates Display
             const coordText = document.querySelector('.coordinates');
@@ -212,10 +226,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchLocationName(lat, lng) {
         try {
-            // BUG 6 FIX: 'User-Agent' is a forbidden browser header and is silently dropped — removed
-            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`);
+            // zoom=14 gives street/neighbourhood level — much more accurate than zoom=10
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`);
             const data = await response.json();
-            const city = data.address.city || data.address.town || data.address.village || data.address.suburb || data.address.county || "San Andreas";
+            const a = data.address;
+            // Pick the most specific populated place name available
+            const city = a.neighbourhood || a.suburb || a.quarter || a.village ||
+                a.town || a.city_district || a.city || a.county || "San Andreas";
 
             const locName = document.querySelector('.location-name');
             if (locName) locName.innerText = city.toUpperCase();
@@ -281,23 +298,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (distEl) distEl.innerText = `${stats.distance.toFixed(2)} km`;
     }
 
-    // Track Distance on Move
-    map.on('moveend', () => {
-        // BUG 3 FIX: guard against turf not being loaded yet
-        if (typeof turf === 'undefined') return;
-        const center = map.getCenter();
-        if (lastMapPos) {
-            const from = turf.point([lastMapPos.lng, lastMapPos.lat]);
-            const to = turf.point([center.lng, center.lat]);
-            const dist = turf.distance(from, to, { units: 'kilometers' });
-            if (dist > 0 && dist < 100) { // Filter huge jumps
-                stats.distance += dist;
-                localStorage.setItem('gta_stats_dist', stats.distance);
-                updateStatsUI();
-            }
-        }
-        lastMapPos = center;
-    });
+    // Track Distance on Move — uses real GPS position deltas, NOT map drag
+    // (map.on('moveend') was removed here; distance is now updated in the geolocation watchPosition callback)
 
     // Initial UI update
     updateStatsUI();
@@ -1193,6 +1195,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Load initial settings
     loadSettings();
+
+    // Initialize volume slider visuals & audio even if no saved settings exist
+    const _volSliderInit = document.getElementById('volume-slider');
+    if (_volSliderInit) {
+        volSlider = _volSliderInit;
+        updateSliderVisuals(volSlider);
+        const initVol = parseFloat(volSlider.value) / 100;
+        Object.values(sounds).forEach(s => s.volume = initVol);
+        sounds.music.volume = initVol * 0.6; // music slightly quieter
+    }
 
     if (usernameInput) {
         usernameInput.addEventListener('input', (e) => {
