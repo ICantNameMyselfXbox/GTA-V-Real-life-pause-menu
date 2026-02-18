@@ -91,6 +91,12 @@ document.addEventListener('DOMContentLoaded', () => {
         attributionControl: false
     });
 
+    map.on('load', () => {
+        startFlightRadar();
+        initStaticMapLayers();
+        initStaticBlips();
+    });
+
     // Add navigation controls (optional, keep minimal for GTA style)
     // map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
@@ -167,22 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 coordText.innerText = `${ns} ${Math.abs(lat).toFixed(4)}°  ${ew} ${Math.abs(lng).toFixed(4)}°`;
             }
 
-            if (!flightRadarStarted) {
-                // Check if map is ready, if not wait for load
-                if (map.isStyleLoaded()) {
-                    startFlightRadar();
-                    initStaticMapLayers();
-                    initStaticBlips();
-                } else {
-                    map.once('load', () => {
-                        startFlightRadar();
-                        initStaticMapLayers();
-                        initStaticBlips();
-                    });
-                    // Mark as started now so we don't attach multiple listeners
-                    flightRadarStarted = true;
-                }
-            }
+
 
         }, error => {
             console.error("Geolocation error:", error);
@@ -244,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let myPeerId = null; // Store local ID to avoid self-blips
     let connections = []; // Track connections if we are the hub
     let flightMarkers = {};
-    let flightRadarStarted = false;
+
     let storeMarkers = {};
     let userPos = { lat: 0, lng: 0 }; // Global tracking
     let radarServiceInitialised = false; // New safety flag
@@ -280,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function startFlightRadar() {
         if (radarServiceInitialised) return;
         radarServiceInitialised = true;
-        flightRadarStarted = true;
+
 
         console.log("+++ Flight Radar Service starting (60s cooldown) +++");
         fetchFlights(); // Initial fetch
@@ -1062,7 +1053,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Lobby
-            const lobbyInput = document.getElementById('lobby-input');
+
 
 
             // Avatar
@@ -1129,7 +1120,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearFlightBlips();
             } else {
                 fetchFlights();
-                fetchAirports();
+
             }
         });
     }
