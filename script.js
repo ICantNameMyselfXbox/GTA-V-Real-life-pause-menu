@@ -323,7 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchFlights(); // Initial fetch
 
         // Start Predictive Glide Loop (every 100ms)
-        setInterval(predictFlights, 100);
+        setInterval(predictFlights, 250); // Reduced from 100ms to ease CPU load
 
         // Map move: only refresh airports/stores, NOT flights
         let moveTimeout;
@@ -382,9 +382,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // Toggle logic based on settings
             const toggle = document.getElementById('flight-radar-toggle');
             if (toggle) {
-                map.setLayoutProperty('airports-layer', 'visibility', toggle.checked ? 'visible' : 'none');
-                toggle.addEventListener('change', (e) => {
-                    map.setLayoutProperty('airports-layer', 'visibility', e.target.checked ? 'visible' : 'none');
+                map.setLayoutProperty('airports-layer', 'visibility', toggle.innerText.includes('On') ? 'visible' : 'none');
+                toggle.addEventListener('click', () => {
+                    // Read state AFTER click (text already updated by the click handler)
+                    setTimeout(() => {
+                        map.setLayoutProperty('airports-layer', 'visibility', toggle.innerText.includes('On') ? 'visible' : 'none');
+                    }, 0);
                 });
             }
         });
@@ -419,24 +422,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const degM = 111111; // Approx meters per degree
 
         for (let id in flightMarkers) {
-            const f = flightMarkers[id];
-            if (f.velocity && f.velocity > 0) {
-                // Approximate dead reckoning
-                const rad = (f.track - 90) * (Math.PI / 180); // Adjusting for polar coords
-                const dx = Math.cos(rad) * f.velocity * deltaT;
-                const dy = -Math.sin(rad) * f.velocity * deltaT; // Lat decreases as we go "South"
+            try {
+                const f = flightMarkers[id];
+                if (!f || !f.marker) continue;
+                if (f.velocity && f.velocity > 0) {
+                    // Approximate dead reckoning
+                    const rad = (f.track - 90) * (Math.PI / 180); // Adjusting for polar coords
+                    const dx = Math.cos(rad) * f.velocity * deltaT;
+                    const dy = -Math.sin(rad) * f.velocity * deltaT; // Lat decreases as we go "South"
 
-                f.lat += dy / degM;
-                f.lng += dx / (degM * Math.cos(f.lat * Math.PI / 180));
+                    f.lat += dy / degM;
+                    f.lng += dx / (degM * Math.cos(f.lat * Math.PI / 180));
 
-                f.marker.setLngLat([f.lng, f.lat]);
+                    f.marker.setLngLat([f.lng, f.lat]);
+                }
+            } catch (e) {
+                // Marker was removed mid-loop, clean up safely
+                delete flightMarkers[id];
             }
         }
     }
 
     async function fetchFlights() {
         const toggle = document.getElementById('flight-radar-toggle');
-        if (toggle && !toggle.checked) {
+        if (toggle && !toggle.innerText.includes('On')) {
             clearFlightBlips();
             scheduleNextFlightFetch(flightCooldown);
             return;
@@ -572,7 +581,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchStores() {
         const toggle = document.getElementById('stores-toggle');
-        if (toggle && !toggle.checked) {
+        if (toggle && !toggle.innerText.includes('On')) {
             clearStoreBlips();
             return;
         }
@@ -1249,6 +1258,16 @@ document.addEventListener('DOMContentLoaded', () => {
         slider.style.backgroundSize = `${percentage}% 100%`;
     }
 
+    // Debounce helper - prevents hammering localStorage on every slider pixel
+    function debounce(fn, delay) {
+        let timer;
+        return (...args) => {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn(...args), delay);
+        };
+    }
+    const debouncedSave = debounce(saveSettings, 500);
+
     sliders.forEach((slider, index) => {
         // Initial visual update
         updateSliderVisuals(slider);
@@ -1271,7 +1290,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
             }
-            saveSettings();
+            debouncedSave(); // Debounced - only saves 500ms after user stops dragging
         });
     });
 
