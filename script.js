@@ -175,12 +175,11 @@ document.addEventListener('DOMContentLoaded', () => {
         userPos.lat = lat;
         userPos.lng = lng;
 
-        const lobbyInput = document.getElementById('lobby-input');
-        // Default to a universal lobby ID if none provided
-        const hubId = (lobbyInput && lobbyInput.value) ? lobbyInput.value.toUpperCase() : 'GTA-V-UNIVERSAL-LOBBY';
+        // Universal Global Lobby ID - Everyone connects here
+        const hubId = 'GTA-V-UNIVERSAL-LOBBY-M4K0';
 
         const statusEl = document.querySelector('.connection-status');
-        if (statusEl) statusEl.innerText = "STARTING PEER...";
+        if (statusEl) statusEl.innerText = "FINDING SESSION...";
 
         // PeerJS Config with STUN servers for NAT traversal
         const peerConfig = {
@@ -203,29 +202,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         peer.on('open', (myId) => {
             console.log('My Peer ID:', myId);
-            if (statusEl) statusEl.innerText = "CONNECTING...";
+            if (statusEl) statusEl.innerText = "JOINING GLOBAL LOBBY...";
             attemptConnect(hubId, myId, peer);
         });
 
         function attemptConnect(targetId, myId, peerRef) {
-            console.log('Attempting to connect to Hub:', targetId);
+            console.log('Attempting to connect to Global Hub:', targetId);
             const conn = peerRef.connect(targetId, { reliable: true });
 
             let connectionTimeout = setTimeout(() => {
                 if (!conn.open) {
-                    console.log('Hub connect timed out. Transitioning to Host...');
+                    console.log('Global Lobby ID available. Claiming as Relay Hub...');
                     conn.close();
                     peerRef.destroy();
                     becomeHub();
                 }
-            }, 5000);
+            }, 4000);
 
             conn.on('open', () => {
                 clearTimeout(connectionTimeout);
-                console.log('Connected to Lobby Hub');
-                if (statusEl) statusEl.innerText = "CONNECTED";
+                console.log('Connected to Global Lobby Relay');
+                if (statusEl) statusEl.innerText = "LOBBY ACTIVE";
                 startHeartbeat(conn, myId);
 
+                // Receive World State from the Hub
                 conn.on('data', (data) => {
                     if (data.type === 'WORLD_SYNC') {
                         // Batch update all other players from the host's master state
@@ -244,13 +244,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             conn.on('close', () => {
-                console.log('Hub connection closed.');
-                if (statusEl) statusEl.innerText = "LINK LOST - RECONNECTING...";
+                console.log('Connection lost. Re-finding session...');
+                if (statusEl) statusEl.innerText = "RE-FINDING SESSION...";
                 setTimeout(() => {
                     if (currentPeer && !currentPeer.destroyed) {
                         initMultiplayer(userPos.lat, userPos.lng);
                     }
-                }, 3000);
+                }, 2000);
             });
 
             conn.on('error', (err) => {
@@ -261,29 +261,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         function becomeHub() {
-            if (statusEl) statusEl.innerText = "HOSTING LOBBY";
+            if (statusEl) statusEl.innerText = "LOBBY ACTIVE (RELAY)";
 
             const hubPeer = new Peer(hubId, peerConfig);
             currentPeer = hubPeer;
 
             hubPeer.on('open', () => {
-                console.log('+++ YOU ARE NOW HOSTING THE HUB +++');
+                console.log('+++ GLOBAL LOBBY RELAY ACTIVE +++');
 
-                // WORLD SYNC: Every 3 seconds, broadcast the entire known world to everyone
+                // MASTER WORLD SYNC: Send the state of EVERYONE to EVERYBODY every 3s
                 setInterval(() => {
                     const worldData = {
                         type: 'WORLD_SYNC',
                         players: {}
                     };
 
-                    // Add Hub (Host) info
+                    // Add Hub's own position
                     worldData.players[hubId] = {
                         lat: userPos.lat,
                         lng: userPos.lng,
                         name: document.querySelector('.username').innerText
                     };
 
-                    // Add all other tracked players
+                    // Add all other connected players
                     for (let id in otherPlayers) {
                         worldData.players[id] = {
                             lat: otherPlayers[id].lat,
@@ -298,7 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 3000);
 
                 hubPeer.on('connection', (conn) => {
-                    console.log('Someone joined your map:', conn.peer);
+                    console.log('New peer joined global flow:', conn.peer);
                     connections.push(conn);
 
                     conn.on('data', (data) => {
@@ -309,7 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     conn.on('close', () => {
                         connections = connections.filter(c => c !== conn);
-                        // Remove player marker when they disconnect
+                        // Clean up blip
                         if (otherPlayers[conn.peer]) {
                             otherPlayers[conn.peer].marker.remove();
                             delete otherPlayers[conn.peer];
@@ -325,7 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     setTimeout(() => initMultiplayer(userPos.lat, userPos.lng), 1000);
                 } else {
                     console.error("Hub Error:", err);
-                    if (statusEl) statusEl.innerText = "HUB ERROR";
+                    if (statusEl) statusEl.innerText = "CONNECTION ERROR";
                 }
             });
 
@@ -352,11 +352,10 @@ document.addEventListener('DOMContentLoaded', () => {
             setInterval(sendUpdate, 3000);
         }
 
+        // Shared peer listener
         peer.on('connection', (conn) => {
             conn.on('data', (data) => {
-                if (data.type === 'POS_UPDATE') {
-                    updateOtherPlayer(data);
-                }
+                if (data.type === 'POS_UPDATE') updateOtherPlayer(data);
             });
         });
     }
@@ -471,7 +470,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const settings = {
             username: usernameInput.value,
             accentColor: colorInput.value,
-            lobbyId: document.getElementById('lobby-input').value,
             avatar: document.querySelector('.avatar').src,
             volume: sliders[0].value,
             brightness: sliders[1].value
@@ -498,9 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Lobby
             const lobbyInput = document.getElementById('lobby-input');
-            if (lobbyInput) {
-                lobbyInput.value = settings.lobbyId || 'GTA-GLOBAL-LOBBY';
-            }
+
 
             // Avatar
             if (settings.avatar) {
@@ -546,16 +542,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const lobbyInput = document.getElementById('lobby-input');
-    if (lobbyInput) {
-        lobbyInput.addEventListener('change', () => {
-            saveSettings();
-            // Re-init multiplayer if we have coordinates
-            if (userPos.lat !== 0) {
-                initMultiplayer(userPos.lat, userPos.lng);
-            }
-        });
-    }
+
 
     sliders.forEach(slider => {
         slider.addEventListener('input', () => {
