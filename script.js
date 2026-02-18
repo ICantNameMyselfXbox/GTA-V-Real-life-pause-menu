@@ -471,9 +471,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const lomax = bounds.getEast().toFixed(4);
 
             // OpenSky API is CORS-restricted for direct browser requests.
-            // Route through allorigins.win which adds CORS headers.
+            // Route through corsproxy.io which adds CORS headers transparently.
             const openskyUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(openskyUrl)}`;
+            const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(openskyUrl)}`;
 
             console.log(`[RADAR] Fetching aircraft in bbox: ${lamin},${lomin} → ${lamax},${lomax}`);
             lastFetchTimes.flights = Date.now();
@@ -486,9 +486,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const wrapper = await response.json();
-            // allorigins wraps the real response in { contents: "..." }
-            const data = JSON.parse(wrapper.contents);
+            // corsproxy.io returns the raw response body (no wrapper)
+            const data = await response.json();
 
             if (data && data.states) {
                 console.log(`[RADAR] ✈ Found ${data.states.length} aircraft.`);
