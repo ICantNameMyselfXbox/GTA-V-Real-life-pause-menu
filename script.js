@@ -265,28 +265,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- FLIGHT RADAR LOGIC (GLOBAL) ---
+    let flightCooldown = 60000; // Start at 60s between fetches
+    let flightFetchTimer = null;
+
+    function scheduleNextFlightFetch(delay) {
+        if (flightFetchTimer) clearTimeout(flightFetchTimer);
+        flightFetchTimer = setTimeout(() => {
+            fetchFlights();
+        }, delay);
+    }
+
     function startFlightRadar() {
         if (radarServiceInitialised) return;
         radarServiceInitialised = true;
-        flightRadarStarted = true; // Ensure both flags are set
+        flightRadarStarted = true;
 
-        console.log("+++ Flight Radar Service starting (Throttled 30s) +++");
-        fetchFlights();
-        setInterval(fetchFlights, 30000); // Increased to 30s for rate safety
+        console.log("+++ Flight Radar Service starting (60s cooldown) +++");
+        fetchFlights(); // Initial fetch
 
         // Start Predictive Glide Loop (every 100ms)
         setInterval(predictFlights, 100);
 
-        // Map events for airports (Debounced)
+        // Map move: only refresh airports/stores, NOT flights
         let moveTimeout;
         map.on('moveend', () => {
-            console.log("Map moved, refreshing airports/flights...");
             clearTimeout(moveTimeout);
             moveTimeout = setTimeout(() => {
-                // Throttled refresh on move
                 const now = Date.now();
-                if (now - lastFetchTimes.flights > 5000) fetchFlights();
-                if (now - lastFetchTimes.stores > 5000) fetchStores();
+                if (now - lastFetchTimes.stores > 30000) fetchStores();
             }, 1000);
         });
 
@@ -367,21 +373,31 @@ document.addEventListener('DOMContentLoaded', () => {
         const toggle = document.getElementById('flight-radar-toggle');
         if (toggle && !toggle.checked) {
             clearFlightBlips();
+            scheduleNextFlightFetch(flightCooldown);
             return;
         }
 
-        if (!map || !map.getStyle()) return;
+        if (!map || !map.getStyle()) {
+            scheduleNextFlightFetch(flightCooldown);
+            return;
+        }
 
         try {
             const bounds = map.getBounds();
-            if (!bounds || typeof bounds.getSouth !== 'function') return;
+            if (!bounds || typeof bounds.getSouth !== 'function') {
+                scheduleNextFlightFetch(flightCooldown);
+                return;
+            }
 
             const lamin = bounds.getSouth();
             const lomin = bounds.getWest();
             const lamax = bounds.getNorth();
             const lomax = bounds.getEast();
 
-            if (lamin === undefined || lomin === undefined) return;
+            if (lamin === undefined || lomin === undefined) {
+                scheduleNextFlightFetch(flightCooldown);
+                return;
+            }
 
             const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
 
@@ -389,12 +405,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(url);
 
             if (response.status === 429) {
-                console.warn("[RADAR] Flight API Rate Limited. Increasing cooldown.");
-                lastFetchTimes.flights += 60000; // Block for 1 min
+                // Exponential backoff: double the cooldown, max 10 minutes
+                flightCooldown = Math.min(flightCooldown * 2, 600000);
+                console.warn(`[RADAR] Rate limited. Next fetch in ${flightCooldown / 1000}s.`);
+                scheduleNextFlightFetch(flightCooldown);
                 return;
             }
+
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const data = await response.json();
+
+            // Success — reset cooldown to base 60s
+            flightCooldown = 60000;
 
             if (data && data.states) {
                 console.log(`[RADAR] Found ${data.states.length} aircraft in view.`);
@@ -404,8 +426,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearFlightBlips();
             }
         } catch (error) {
-            console.warn("[RADAR] Data fetch failed (API might be rate-limited):", error);
+            console.warn("[RADAR] Data fetch failed:", error);
         }
+
+        // Schedule next fetch
+        scheduleNextFlightFetch(flightCooldown);
     }
 
     function updateFlightBlips(states) {
