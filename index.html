@@ -42,9 +42,16 @@
             <!-- MAP TAB -->
             <section id="map" class="tab-content active">
                 <div id="map-container"></div>
-                <div class="map-overlay-info">
+                <div class="map-overlay-info" id="map-overlay-info">
                     <div class="location-name">Los Santos</div>
                     <div class="coordinates">N 34° 11' 22" W 118° 34' 12"</div>
+                </div>
+                <!-- Player Legend Panel -->
+                <div class="player-legend" id="player-legend">
+                    <div class="legend-header">PLAYERS</div>
+                    <div class="legend-list" id="legend-list">
+                        <!-- Populated by JS -->
+                    </div>
                 </div>
             </section>
 
@@ -135,6 +142,14 @@
                     <div class="setting-item">
                         <label>Connection Status</label>
                         <div class="connection-status">Connecting...</div>
+                    </div>
+                    <div class="setting-item">
+                        <label>Player Legend</label>
+                        <div class="setting-toggle" id="legend-toggle">&lt; On &gt;</div>
+                    </div>
+                    <div class="setting-item">
+                        <label>Map Overlay</label>
+                        <div class="setting-toggle" id="overlay-toggle">&lt; On &gt;</div>
                     </div>
                     <div class="setting-item">
                         <label>Flight Radar</label>

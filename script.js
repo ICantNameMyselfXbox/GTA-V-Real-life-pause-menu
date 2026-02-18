@@ -1010,6 +1010,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 lastUpdate: Date.now()
             };
         }
+
+        updateLegend();
     }
 
     // Cleanup stale blips after 15 seconds
@@ -1021,7 +1023,48 @@ document.addEventListener('DOMContentLoaded', () => {
                 delete otherPlayers[id];
             }
         }
+        updateLegend();
     }, 5000);
+
+    // --- PLAYER LEGEND ---
+    function updateLegend() {
+        const legendList = document.getElementById('legend-list');
+        if (!legendList) return;
+
+        legendList.innerHTML = '';
+
+        // Self entry
+        const selfName = document.querySelector('.username')?.innerText || 'YOU';
+        const selfAvatar = document.querySelector('.avatar')?.src || '';
+        const selfEntry = document.createElement('div');
+        selfEntry.className = 'legend-entry';
+        selfEntry.innerHTML = `
+            <img class="legend-avatar" src="${selfAvatar}" alt="You"
+                 onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <div class="legend-dot self" style="display:none"></div>
+            <span class="legend-name self">${selfName} (YOU)</span>
+        `;
+        legendList.appendChild(selfEntry);
+
+        // Other players
+        for (let id in otherPlayers) {
+            const p = otherPlayers[id];
+            const entry = document.createElement('div');
+            entry.className = 'legend-entry';
+            // Generate a deterministic avatar from their name
+            const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name || 'P')}&background=random&color=fff&size=48`;
+            entry.innerHTML = `
+                <img class="legend-avatar" src="${avatarUrl}" alt="${p.name || 'Player'}"
+                     onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+                <div class="legend-dot other" style="display:none"></div>
+                <span class="legend-name other">${p.name || 'Unknown'}</span>
+            `;
+            legendList.appendChild(entry);
+        }
+    }
+
+    // Initial legend render (just self)
+    updateLegend();
 
     // Weather API (Open-Meteo)
     async function fetchWeather(lat, lng) {
@@ -1121,6 +1164,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const flightToggle = document.getElementById('flight-radar-toggle');
         const storesToggle = document.getElementById('stores-toggle');
         const blipSlider = document.getElementById('blip-scale-slider');
+        const legendToggle = document.getElementById('legend-toggle');
+        const overlayToggle = document.getElementById('overlay-toggle');
 
         const settings = {
             username: usernameInput.value,
@@ -1129,7 +1174,9 @@ document.addEventListener('DOMContentLoaded', () => {
             volume: volSlider ? volSlider.value : 80,
             flightRadar: flightToggle ? flightToggle.innerText.includes('On') : true,
             showStores: storesToggle ? storesToggle.innerText.includes('On') : true,
-            blipScale: blipSlider ? blipSlider.value : 1.0
+            blipScale: blipSlider ? blipSlider.value : 1.0,
+            showLegend: legendToggle ? legendToggle.innerText.includes('On') : true,
+            showOverlay: overlayToggle ? overlayToggle.innerText.includes('On') : true
         };
         localStorage.setItem('gta_pause_settings', JSON.stringify(settings));
     }
@@ -1190,6 +1237,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 storesToggle.innerText = settings.showStores ? '< On >' : '< Off >';
                 if (!settings.showStores) clearStoreBlips();
             }
+
+            // Legend
+            const legendToggle = document.getElementById('legend-toggle');
+            if (legendToggle && settings.hasOwnProperty('showLegend')) {
+                legendToggle.innerText = settings.showLegend ? '< On >' : '< Off >';
+                const legendEl = document.getElementById('player-legend');
+                if (legendEl) legendEl.classList.toggle('hidden', !settings.showLegend);
+            }
+
+            // Map Overlay
+            const overlayToggle = document.getElementById('overlay-toggle');
+            if (overlayToggle && settings.hasOwnProperty('showOverlay')) {
+                overlayToggle.innerText = settings.showOverlay ? '< On >' : '< Off >';
+                const overlayEl = document.getElementById('map-overlay-info');
+                if (overlayEl) overlayEl.classList.toggle('hidden', !settings.showOverlay);
+            }
         }
     }
 
@@ -1209,6 +1272,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (usernameInput) {
         usernameInput.addEventListener('input', (e) => {
             document.querySelector('.username').innerText = e.target.value || 'PlayerOne';
+            updateLegend();
             saveSettings();
         });
     }
@@ -1261,6 +1325,30 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 fetchStores();
             }
+        });
+    }
+
+    // Legend toggle
+    const legendToggle = document.getElementById('legend-toggle');
+    if (legendToggle) {
+        legendToggle.addEventListener('click', () => {
+            const isOn = legendToggle.innerText.includes('On');
+            legendToggle.innerText = isOn ? '< Off >' : '< On >';
+            const legendEl = document.getElementById('player-legend');
+            if (legendEl) legendEl.classList.toggle('hidden', isOn);
+            saveSettings();
+        });
+    }
+
+    // Map Overlay toggle
+    const overlayToggle = document.getElementById('overlay-toggle');
+    if (overlayToggle) {
+        overlayToggle.addEventListener('click', () => {
+            const isOn = overlayToggle.innerText.includes('On');
+            overlayToggle.innerText = isOn ? '< Off >' : '< On >';
+            const overlayEl = document.getElementById('map-overlay-info');
+            if (overlayEl) overlayEl.classList.toggle('hidden', isOn);
+            saveSettings();
         });
     }
 

@@ -157,10 +157,104 @@ body {
     }
 }
 
-/* Map Tab */
-#map {
-    padding: 0;
+/* Player Legend Panel */
+.player-legend {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-left: 3px solid var(--accent-color);
+    min-width: 180px;
+    max-width: 220px;
+    max-height: calc(100% - 40px);
+    display: flex;
+    flex-direction: column;
+    pointer-events: none;
+    z-index: 800;
+    backdrop-filter: blur(4px);
 }
+
+.legend-header {
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--accent-color);
+    padding: 6px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    text-transform: uppercase;
+}
+
+.legend-list {
+    overflow-y: auto;
+    flex: 1;
+}
+
+.legend-entry {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.legend-entry:last-child {
+    border-bottom: none;
+}
+
+.legend-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    flex-shrink: 0;
+}
+
+.legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.legend-dot.self {
+    background: #fff;
+    box-shadow: 0 0 4px #fff;
+}
+
+.legend-dot.other {
+    background: var(--accent-color);
+    box-shadow: 0 0 4px var(--accent-color);
+}
+
+.legend-name {
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.legend-name.self {
+    color: #fff;
+}
+
+.legend-name.other {
+    color: #ccc;
+}
+
+/* Hide legend when toggled off */
+.player-legend.hidden,
+.map-overlay-info.hidden {
+    display: none;
+}
+
+
 
 #map-container {
     width: 100%;
@@ -382,7 +476,7 @@ body {
 }
 
 .player-blip {
-    z-index: 400;
+    z-index: 600;
 }
 
 .other-blip {
@@ -452,12 +546,14 @@ body {
     font-size: 2rem;
     font-weight: 700;
     text-transform: uppercase;
+    line-height: 1;
 }
 
 .coordinates {
     font-size: 1rem;
     color: #aaa;
-    margin-top: 5px;
+    margin-top: 0;
+    line-height: 1;
 }
 
 /* Weather Tab */
@@ -837,6 +933,4 @@ body {
     .key-hint {
         font-size: 0.8rem;
     }
-
 }
-
