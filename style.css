@@ -304,7 +304,8 @@ body {
 }
 
 .other-blip:hover .blip-name-tag,
-.other-blip:active .blip-name-tag {
+.other-blip:active .blip-name-tag,
+.other-blip.show-name .blip-name-tag {
     opacity: 1;
 }
 
@@ -316,22 +317,20 @@ body {
     border-radius: 50%;
     position: relative;
     cursor: pointer;
+    animation: flash 1s infinite;
 }
 
-.player-blip:hover::after {
-    content: "YOU";
-    position: absolute;
-    left: 110%;
-    top: 50%;
-    transform: translateY(-50%);
-    background: rgba(0, 0, 0, 0.9);
-    color: #fff;
-    padding: 4px 10px;
-    font-family: 'Oswald', sans-serif;
-    font-size: 0.9rem;
-    text-transform: uppercase;
+.other-blip:hover .blip-name-tag,
+.other-blip:active .blip-name-tag,
+.other-blip.show-name .blip-name-tag,
+.player-blip:hover .blip-name-tag,
+.player-blip:active .blip-name-tag,
+.player-blip.show-name .blip-name-tag {
+    opacity: 1;
+}
+
+.player-blip .blip-name-tag {
     border-left: 3px solid #fff;
-    white-space: nowrap;
 }
 
 .location-name {
@@ -577,4 +576,103 @@ body {
     border-radius: 4px;
     font-weight: 700;
     font-size: 0.9rem;
+}
+
+/* --- MOBILE RESPONSIVENESS --- */
+@media (max-width: 768px) {
+    .menu-header {
+        padding: 0 15px;
+    }
+
+    .logo {
+        font-size: 1.8rem;
+    }
+
+    .username,
+    .clock-display {
+        font-size: 0.9rem;
+    }
+
+    .nav-list {
+        gap: 15px;
+        overflow-x: auto;
+        padding-bottom: 5px;
+    }
+
+    .nav-item {
+        font-size: 1.1rem;
+        white-space: nowrap;
+    }
+
+    .tab-content {
+        padding: 20px 15px;
+    }
+
+    .info-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+    }
+
+    .weather-icon {
+        font-size: 5rem;
+    }
+
+    .temperature {
+        font-size: 4rem;
+    }
+
+    .forecast-row {
+        gap: 15px;
+        overflow-x: auto;
+        justify-content: flex-start;
+        width: 100%;
+        padding-bottom: 10px;
+    }
+
+    .forecast-item {
+        padding: 15px 25px;
+        flex-shrink: 0;
+    }
+
+    .settings-list {
+        gap: 15px;
+    }
+
+    .setting-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .gta-input,
+    .gta-slider {
+        width: 100%;
+    }
+
+    .map-overlay-info {
+        bottom: 20px;
+        left: 20px;
+        right: 20px;
+    }
+
+    .location-name {
+        font-size: 1.4rem;
+    }
+
+    .coordinates {
+        font-size: 0.8rem;
+    }
+
+    .menu-footer {
+        padding: 0 15px;
+        gap: 15px;
+    }
+
+    .key-hint {
+        font-size: 0.8rem;
+    }
 }

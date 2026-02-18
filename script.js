@@ -112,6 +112,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 const playerMarkerEl = document.createElement('div');
                 playerMarkerEl.className = 'player-blip';
 
+                // Create Name Tag for self
+                const nameTag = document.createElement('span');
+                nameTag.className = 'blip-name-tag';
+                nameTag.innerText = 'YOU';
+                playerMarkerEl.appendChild(nameTag);
+
+                // --- MOBILE TOUCH SUPPORT (Personal Blip) ---
+                playerMarkerEl.addEventListener('click', (e) => {
+                    playerMarkerEl.classList.add('show-name');
+                    if (playerMarkerEl.hideTimer) clearTimeout(playerMarkerEl.hideTimer);
+                    playerMarkerEl.hideTimer = setTimeout(() => {
+                        playerMarkerEl.classList.remove('show-name');
+                    }, 3000);
+                    e.stopPropagation();
+                });
+
                 playerMarker = new maplibregl.Marker({ element: playerMarkerEl })
                     .setLngLat([lng, lat])
                     .addTo(map);
@@ -830,6 +846,23 @@ document.addEventListener('DOMContentLoaded', () => {
             nameTag.className = 'blip-name-tag';
             nameTag.innerText = data.name || "Unknown Player";
             el.appendChild(nameTag);
+
+            // --- MOBILE TOUCH SUPPORT ---
+            el.addEventListener('click', (e) => {
+                // Toggle show-name class
+                el.classList.add('show-name');
+
+                // Clear any existing timer
+                if (el.hideTimer) clearTimeout(el.hideTimer);
+
+                // Auto-hide after 3 seconds
+                el.hideTimer = setTimeout(() => {
+                    el.classList.remove('show-name');
+                }, 3000);
+
+                // Prevent map click events
+                e.stopPropagation();
+            });
 
             const marker = new maplibregl.Marker({ element: el })
                 .setLngLat([data.lng, data.lat])
