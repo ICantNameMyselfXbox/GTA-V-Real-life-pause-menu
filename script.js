@@ -88,13 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
         style: styleUrl,
         center: [-0.09, 51.505], // Default London
         zoom: 13,
-        attributionControl: false,
-        dragPan: true,
-        scrollZoom: true,
-        boxZoom: true,
-        keyboard: true,
-        touchZoomRotate: true,
-        doubleClickZoom: true
+        attributionControl: false
     });
 
     map.on('load', () => {
@@ -292,7 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Track Distance on Move
     map.on('moveend', () => {
         const center = map.getCenter();
-        if (lastMapPos && typeof turf !== 'undefined') {
+        if (lastMapPos) {
             const from = turf.point([lastMapPos.lng, lastMapPos.lat]);
             const to = turf.point([center.lng, center.lat]);
             const dist = turf.distance(from, to, { units: 'kilometers' });
@@ -823,7 +817,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     otherPlayers[id].marker.remove();
                 }
                 otherPlayers = {};
-                updatePlayerCount();
 
                 if (peerIdEl) peerIdEl.innerText = hubId;
 
@@ -865,7 +858,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     conn.on('data', (data) => {
                         if (data.type === 'POS_UPDATE') {
                             updateOtherPlayer(data);
-                            updatePlayerCount();
                         }
                     });
 
@@ -875,7 +867,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (otherPlayers[conn.peer]) {
                             otherPlayers[conn.peer].marker.remove();
                             delete otherPlayers[conn.peer];
-                            updatePlayerCount();
                         }
                     });
                 });
