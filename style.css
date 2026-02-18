@@ -283,9 +283,9 @@ body {
 
 /* The actual visual icon */
 .blip-icon {
-    width: 30px;
-    height: 30px;
-    background-size: cover;
+    width: 32px;
+    height: 32px;
+    background-size: contain;
     background-position: center;
     background-repeat: no-repeat;
     flex-shrink: 0;
