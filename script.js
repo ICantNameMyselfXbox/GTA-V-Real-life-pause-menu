@@ -517,6 +517,10 @@ document.addEventListener('DOMContentLoaded', () => {
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' },
+                    { urls: 'stun:stun2.l.google.com:19302' },
+                    { urls: 'stun:stun3.l.google.com:19302' },
+                    { urls: 'stun:stun4.l.google.com:19302' },
                     { urls: 'stun:global.stun.twilio.com:3478' }
                 ]
             }
@@ -538,6 +542,17 @@ document.addEventListener('DOMContentLoaded', () => {
             attemptConnect(hubId, myId, peer);
         });
 
+        peer.on('error', (err) => {
+            console.error('Peer Primary Error:', err.type, err);
+            if (err.type === 'peer-unavailable') {
+                // Lobby peer is likely dead or transition in progress
+                becomeHub();
+            } else if (err.type === 'network' || err.type === 'server-error') {
+                if (statusEl) statusEl.innerText = "RECONNECTING...";
+                setTimeout(() => initMultiplayer(userPos.lat, userPos.lng), 3000);
+            }
+        });
+
         function attemptConnect(targetId, myId, peerRef) {
             console.log('Attempting to connect to Global Hub:', targetId);
             const conn = peerRef.connect(targetId, {
@@ -547,12 +562,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let connectionTimeout = setTimeout(() => {
                 if (!conn.open) {
-                    console.log('Global Lobby ID available. Claiming as Relay Hub...');
+                    console.log('Global Lobby ID handshaking too slow. Claiming as Relay Hub...');
                     conn.close();
                     peerRef.destroy();
                     becomeHub();
                 }
-            }, 4000);
+            }, 8000); // Increased to 8s for high-latency discovery
 
             conn.on('open', () => {
                 clearTimeout(connectionTimeout);
