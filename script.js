@@ -125,6 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // --- MOBILE TOUCH SUPPORT (Personal Blip) ---
                 playerMarkerEl.addEventListener('click', (e) => {
+                    e.preventDefault(); // Stop map drag
                     playerMarkerEl.classList.add('show-name');
                     if (playerMarkerEl.hideTimer) clearTimeout(playerMarkerEl.hideTimer);
                     playerMarkerEl.hideTimer = setTimeout(() => {
@@ -135,7 +136,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 playerMarker = new maplibregl.Marker({
                     element: playerMarkerEl,
-                    anchor: 'center' // CRITICAL for zoom stability
+                    anchor: 'center', // CRITICAL for zoom stability
+                    rotationAlignment: 'map',
+                    pitchAlignment: 'map'
                 })
                     .setLngLat([lng, lat])
                     .addTo(map);
@@ -441,7 +444,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     const marker = new maplibregl.Marker({
                         element: el,
                         rotation: track,
-                        anchor: 'center'
+                        anchor: 'center',
+                        rotationAlignment: 'map',
+                        pitchAlignment: 'map'
                     })
                         .setLngLat([lng, lat])
                         .addTo(map);
@@ -540,7 +545,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const marker = new maplibregl.Marker({
                         element: markerEl,
-                        anchor: 'center'
+                        anchor: 'center',
+                        rotationAlignment: 'map',
+                        pitchAlignment: 'map'
                     })
                         .setLngLat([lon, lat])
                         .addTo(map);
@@ -831,11 +838,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Don't draw blips at 0,0
         if (Math.abs(data.lat) < 0.0001 && Math.abs(data.lng) < 0.0001) return;
 
-        // Proximity Guard: If blip is within ~15 meters of us, it's probably a stale version of us
-        // (0.00015 degrees is roughly 15 meters)
+        // Proximity Guard: If blip is within ~100 meters of us, it's probably a stale version of us
+        // (0.001 degrees is roughly 100 meters)
         const latDiff = Math.abs(data.lat - (userPos.lat || 0));
         const lngDiff = Math.abs(data.lng - (userPos.lng || 0));
-        if (latDiff < 0.00015 && lngDiff < 0.00015) return;
+        if (latDiff < 0.001 && lngDiff < 0.001) return;
 
         if (otherPlayers[id]) {
             otherPlayers[id].marker.setLngLat([data.lng, data.lat]);
@@ -866,6 +873,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // --- MOBILE TOUCH SUPPORT ---
             el.addEventListener('click', (e) => {
+                e.preventDefault(); // Stop map drag
                 // Toggle show-name class
                 el.classList.add('show-name');
 
@@ -883,7 +891,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const marker = new maplibregl.Marker({
                 element: el,
-                anchor: 'center' // CRITICAL for zoom stability
+                anchor: 'center', // CRITICAL for zoom stability
+                rotationAlignment: 'map',
+                pitchAlignment: 'map'
             })
                 .setLngLat([data.lng, data.lat])
                 .addTo(map);
