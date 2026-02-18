@@ -434,11 +434,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     const el = document.createElement('div');
                     el.className = isHeli ? 'heli-blip' : 'plane-blip';
 
-                    // Randomize plane icons if it's a plane
+                    // Randomize plane icons via CSS class
                     if (!isHeli) {
                         const rand = Math.floor(Math.random() * 12);
-                        const assetName = rand === 0 ? 'radar_player_plane.png' : `radar_player_plane${rand}.png`;
-                        el.style.backgroundImage = `url('Blips/${assetName}')`;
+                        el.classList.add(`plane-${rand}`);
                     }
 
                     const marker = new maplibregl.Marker({

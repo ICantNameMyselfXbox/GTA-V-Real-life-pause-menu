@@ -199,16 +199,39 @@ body {
 /* Flight Blips */
 .plane-blip,
 .heli-blip {
-    width: 32px;
-    height: 32px;
+    width: 0;
+    height: 0;
+    position: relative;
+    pointer-events: none;
+    display: block;
+}
+
+.plane-blip::after,
+.heli-blip::after {
+    content: '';
+    display: block;
+    position: absolute;
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
     filter: drop-shadow(0 0 2px black);
-    transition: opacity 0.3s ease;
-    /* Avoid transitioning transform/all as it conflicts with MapLibre's internal positioning */
-    pointer-events: none;
     opacity: 0.9;
+}
+
+.plane-blip::after {
+    width: 32px;
+    height: 32px;
+    top: -16px;
+    left: -16px;
+    background-image: url('Blips/radar_player_plane.png');
+}
+
+.heli-blip::after {
+    width: 48px;
+    height: 48px;
+    top: -24px;
+    left: -24px;
+    background-image: url('Blips/radar_player_heli.gif');
 }
 
 .airport-blip {
@@ -234,14 +257,53 @@ body {
     cursor: help;
 }
 
-.plane-blip {
+/* Plane variants - assigned via JS class */
+.plane-blip.plane-0::after {
     background-image: url('Blips/radar_player_plane.png');
 }
 
-.heli-blip {
-    background-image: url('Blips/radar_player_heli.gif');
-    width: 48px;
-    height: 48px;
+.plane-blip.plane-1::after {
+    background-image: url('Blips/radar_player_plane1.png');
+}
+
+.plane-blip.plane-2::after {
+    background-image: url('Blips/radar_player_plane2.png');
+}
+
+.plane-blip.plane-3::after {
+    background-image: url('Blips/radar_player_plane3.png');
+}
+
+.plane-blip.plane-4::after {
+    background-image: url('Blips/radar_player_plane4.png');
+}
+
+.plane-blip.plane-5::after {
+    background-image: url('Blips/radar_player_plane5.png');
+}
+
+.plane-blip.plane-6::after {
+    background-image: url('Blips/radar_player_plane6.png');
+}
+
+.plane-blip.plane-7::after {
+    background-image: url('Blips/radar_player_plane7.png');
+}
+
+.plane-blip.plane-8::after {
+    background-image: url('Blips/radar_player_plane8.png');
+}
+
+.plane-blip.plane-9::after {
+    background-image: url('Blips/radar_player_plane9.png');
+}
+
+.plane-blip.plane-10::after {
+    background-image: url('Blips/radar_player_plane10.png');
+}
+
+.plane-blip.plane-11::after {
+    background-image: url('Blips/radar_player_plane11.png');
 }
 
 /* Flight Blips no longer flash */
