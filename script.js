@@ -292,7 +292,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Track Distance on Move
     map.on('moveend', () => {
         const center = map.getCenter();
-        const center = map.getCenter();
         if (lastMapPos && typeof turf !== 'undefined') {
             const from = turf.point([lastMapPos.lng, lastMapPos.lat]);
             const to = turf.point([center.lng, center.lat]);
