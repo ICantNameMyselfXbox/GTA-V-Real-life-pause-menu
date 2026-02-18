@@ -659,6 +659,19 @@ body {
 }
 
 /* Range Slider Styling */
+.setting-toggle {
+    font-size: 1.2rem;
+    font-weight: 700;
+    cursor: pointer;
+    user-select: none;
+    min-width: 80px;
+    text-align: right;
+}
+
+.setting-toggle:hover {
+    color: var(--accent-color);
+}
+
 /* Range Slider Styling - GTA Style Bar */
 .gta-slider {
     -webkit-appearance: none;

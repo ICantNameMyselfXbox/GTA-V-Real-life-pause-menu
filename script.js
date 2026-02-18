@@ -256,6 +256,52 @@ document.addEventListener('DOMContentLoaded', () => {
         stores: 0
     };
 
+    // --- STATS TRACKING ---
+    let stats = {
+        timeSpent: parseInt(localStorage.getItem('gta_stats_time') || '0'),
+        distance: parseFloat(localStorage.getItem('gta_stats_dist') || '0')
+    };
+    let lastMapPos = null;
+
+    // Timer (every minute)
+    setInterval(() => {
+        stats.timeSpent++;
+        localStorage.setItem('gta_stats_time', stats.timeSpent);
+        updateStatsUI();
+    }, 60000);
+
+    function updateStatsUI() {
+        // Time
+        const hours = Math.floor(stats.timeSpent / 60);
+        const mins = stats.timeSpent % 60;
+        const timeStr = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+        const timeEl = document.getElementById('stat-time');
+        if (timeEl) timeEl.innerText = timeStr;
+
+        // Distance
+        const distEl = document.getElementById('stat-distance');
+        if (distEl) distEl.innerText = `${stats.distance.toFixed(2)} km`;
+    }
+
+    // Track Distance on Move
+    map.on('moveend', () => {
+        const center = map.getCenter();
+        if (lastMapPos) {
+            const from = turf.point([lastMapPos.lng, lastMapPos.lat]);
+            const to = turf.point([center.lng, center.lat]);
+            const dist = turf.distance(from, to, { units: 'kilometers' });
+            if (dist > 0 && dist < 100) { // Filter huge jumps
+                stats.distance += dist;
+                localStorage.setItem('gta_stats_dist', stats.distance);
+                updateStatsUI();
+            }
+        }
+        lastMapPos = center;
+    });
+
+    // Initial UI update
+    updateStatsUI();
+
 
     // --- FLIGHT RADAR LOGIC (GLOBAL) ---
     let flightCooldown = 60000; // Start at 60s between fetches
@@ -1066,8 +1112,8 @@ document.addEventListener('DOMContentLoaded', () => {
             avatar: document.querySelector('.avatar').src,
             volume: sliders[0].value,
             brightness: sliders[1].value,
-            flightRadar: flightToggle ? flightToggle.checked : true,
-            showStores: storesToggle ? storesToggle.checked : true,
+            flightRadar: flightToggle ? flightToggle.innerText.includes('On') : true,
+            showStores: storesToggle ? storesToggle.innerText.includes('On') : true,
             blipScale: sliders[2] ? sliders[2].value : 1.0
         };
         localStorage.setItem('gta_pause_settings', JSON.stringify(settings));
@@ -1115,13 +1161,15 @@ document.addEventListener('DOMContentLoaded', () => {
             // Flight Radar
             const flightToggle = document.getElementById('flight-radar-toggle');
             if (flightToggle && settings.hasOwnProperty('flightRadar')) {
-                flightToggle.checked = settings.flightRadar;
+                flightToggle.innerText = settings.flightRadar ? '< On >' : '< Off >';
+                if (!settings.flightRadar) clearFlightBlips(); // Sync state
             }
 
             // Stores
             const storesToggle = document.getElementById('stores-toggle');
             if (storesToggle && settings.hasOwnProperty('showStores')) {
-                storesToggle.checked = settings.showStores;
+                storesToggle.innerText = settings.showStores ? '< On >' : '< Off >';
+                if (!settings.showStores) clearStoreBlips();
             }
         }
     }
@@ -1159,22 +1207,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const flightToggle = document.getElementById('flight-radar-toggle');
     if (flightToggle) {
-        flightToggle.addEventListener('change', () => {
+        flightToggle.addEventListener('click', () => {
+            const isOn = flightToggle.innerText.includes('On');
+            flightToggle.innerText = isOn ? '< Off >' : '< On >';
             saveSettings();
-            if (!flightToggle.checked) {
+
+            if (isOn) { // Was On, now Off
                 clearFlightBlips();
             } else {
                 fetchFlights();
-
             }
         });
     }
 
     const storesToggle = document.getElementById('stores-toggle');
     if (storesToggle) {
-        storesToggle.addEventListener('change', () => {
+        storesToggle.addEventListener('click', () => {
+            const isOn = storesToggle.innerText.includes('On');
+            storesToggle.innerText = isOn ? '< Off >' : '< On >';
             saveSettings();
-            if (!storesToggle.checked) {
+
+            if (isOn) {
                 clearStoreBlips();
             } else {
                 fetchStores();
