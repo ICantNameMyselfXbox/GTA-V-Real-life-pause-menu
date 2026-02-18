@@ -569,8 +569,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     { urls: 'stun:stun3.l.google.com:19302' },
                     { urls: 'stun:stun4.l.google.com:19302' },
                     { urls: 'stun:global.stun.twilio.com:3478' },
-                    // --- TURN SERVER (Paste Relay Credentials here for 100% Mobile/4G coverage) ---
-                    // { urls: 'turn:YOUR_TURN_URL', username: 'USERNAME', credential: 'PASSWORD' }
+                    // --- TURN SERVER (REQUIRED FOR MOBILE DATA / 5G) ---
+                    // 1. Go to Metered.ca (Free account)
+                    // 2. Paste your TURN server details below:
+                    // { 
+                    //   urls: 'turn:YOUR_RELAY_URL:443', 
+                    //   username: 'YOUR_USERNAME', 
+                    //   credential: 'YOUR_PASSWORD' 
+                    // }
                 ]
             }
         };
@@ -613,12 +619,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             let connectionTimeout = setTimeout(() => {
                 if (!conn.open) {
-                    console.log('Global Lobby ID handshaking too slow. Claiming as Relay Hub...');
+                    console.log('Mobile Data / NAT likely blocking connection. Attempting Relay Hub mode...');
+                    if (statusEl) statusEl.innerText = "NAT RESTRICTED - TRYING RELAY...";
                     conn.close();
                     peerRef.destroy();
                     becomeHub();
                 }
-            }, 8000); // Increased to 8s for high-latency discovery
+            }, 8000);
 
             conn.on('open', () => {
                 clearTimeout(connectionTimeout);
@@ -796,9 +803,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Don't draw blips at 0,0
         if (Math.abs(data.lat) < 0.0001 && Math.abs(data.lng) < 0.0001) return;
 
-        // Proximity Guard: If blip is within ~1 meter of us, it's probably a stale version of us
-        const dist = Math.sqrt(Math.pow(data.lat - userPos.lat, 2) + Math.pow(data.lng - userPos.lng, 2));
-        if (dist < 0.00001) return;
+        // Proximity Guard: If blip is within ~15 meters of us, it's probably a stale version of us
+        // (0.00015 degrees is roughly 15 meters)
+        const latDiff = Math.abs(data.lat - (userPos.lat || 0));
+        const lngDiff = Math.abs(data.lng - (userPos.lng || 0));
+        if (latDiff < 0.00015 && lngDiff < 0.00015) return;
 
         if (otherPlayers[id]) {
             otherPlayers[id].marker.setLngLat([data.lng, data.lat]);
