@@ -458,56 +458,37 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Need a user position to do radius-based search
+        if (!userPos || !userPos.lat || !userPos.lng) {
+            scheduleNextFlightFetch(flightCooldown);
+            return;
+        }
+
         try {
-            const bounds = map.getBounds();
-            if (!bounds || typeof bounds.getSouth !== 'function') {
-                scheduleNextFlightFetch(flightCooldown);
-                return;
-            }
+            // adsb.lol (ADS-B Exchange) — has native CORS headers, no proxy needed!
+            // Returns aircraft within `dist` nautical miles of a lat/lon
+            const dist = 250; // nautical miles radius
+            const url = `https://api.adsb.lol/v2/lat/${userPos.lat.toFixed(4)}/lon/${userPos.lng.toFixed(4)}/dist/${dist}`;
 
-            const lamin = bounds.getSouth().toFixed(4);
-            const lomin = bounds.getWest().toFixed(4);
-            const lamax = bounds.getNorth().toFixed(4);
-            const lomax = bounds.getEast().toFixed(4);
-
-            // OpenSky API is CORS-restricted for direct browser requests.
-            // Route through corsproxy.io which adds CORS headers transparently.
-            const openskyUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
-            const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(openskyUrl)}`;
-
-            console.log(`[RADAR] Fetching aircraft in bbox: ${lamin},${lomin} → ${lamax},${lomax}`);
+            console.log(`[RADAR] Fetching aircraft via adsb.lol (r=${dist}nm around ${userPos.lat.toFixed(3)},${userPos.lng.toFixed(3)})...`);
             lastFetchTimes.flights = Date.now();
 
-            const response = await fetch(proxyUrl);
+            const response = await fetch(url);
 
             if (!response.ok) {
-                console.warn(`[RADAR] Proxy HTTP error: ${response.status}`);
+                console.warn(`[RADAR] HTTP error: ${response.status}`);
                 scheduleNextFlightFetch(flightCooldown);
                 return;
             }
 
-            // Read raw text first so we can log/debug on parse failure
-            const rawText = await response.text();
+            const data = await response.json();
 
-            let data;
-            try {
-                data = JSON.parse(rawText);
-            } catch (parseErr) {
-                console.warn('[RADAR] Bad JSON from proxy. Raw response:', rawText.slice(0, 300));
-                scheduleNextFlightFetch(flightCooldown);
-                return;
-            }
-
-            if (data && data.states) {
-                console.log(`[RADAR] ✈ Found ${data.states.length} aircraft.`);
+            if (data && Array.isArray(data.ac)) {
+                console.log(`[RADAR] ✈ Found ${data.ac.length} aircraft.`);
                 flightCooldown = 60000; // reset on success
-                updateFlightBlips(data.states);
-            } else if (data && ((data.message && data.message.includes('rate limit')) || data.error)) {
-                flightCooldown = Math.min(flightCooldown * 2, 600000);
-                console.warn(`[RADAR] Rate limited / proxy error. Next fetch in ${flightCooldown / 1000}s. Response:`, data);
-                clearFlightBlips();
+                updateFlightBlips(data.ac);
             } else {
-                console.log('[RADAR] No aircraft in this region. Response:', data);
+                console.log('[RADAR] No aircraft in range. Response:', data);
                 clearFlightBlips();
             }
 
@@ -519,51 +500,56 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    function updateFlightBlips(states) {
+    function updateFlightBlips(aircraft) {
         const seenIds = new Set();
 
-        states.forEach(state => {
-            const id = state[0];
-            const lng = state[5];
-            const lat = state[6];
-            const track = state[10] || 0;
-            const velocity = state[9] || 0;
-            const altitude = state[7]; // can be null for ground vehicles
+        aircraft.forEach(ac => {
+            // adsb.lol fields: hex, lat, lon, track, gs (ground speed), alt_baro, category, t (type)
+            const id = ac.hex;
+            const lat = ac.lat;
+            const lng = ac.lon;
+            const track = ac.track || 0;
+            const gs = ac.gs || 0;         // ground speed in knots
+            const alt = ac.alt_baro;       // altitude in feet (can be "ground")
+            const category = ac.category || ''; // e.g. "A1"–"A7", "B1"–"B7"
+            const typecode = (ac.t || '').toUpperCase();
 
-            if (lat && lng) {
-                seenIds.add(id);
-                // Null-safe isHeli: on-ground or very slow + low altitude
-                const isHeli = velocity < 60 && (altitude === null || altitude < 1000);
+            if (!lat || !lng) return;
 
-                if (flightMarkers[id]) {
-                    flightMarkers[id].marker.setLngLat([lng, lat]);
-                    flightMarkers[id].el.style.transform = `rotate(${track}deg)`;
-                    flightMarkers[id].lat = lat;
-                    flightMarkers[id].lng = lng;
-                    flightMarkers[id].velocity = velocity;
-                    flightMarkers[id].track = track;
-                } else {
-                    const el = document.createElement('div');
-                    el.className = isHeli ? 'heli-blip' : 'plane-blip';
-                    el.style.transform = `rotate(${track}deg)`;
+            seenIds.add(id);
 
-                    if (!isHeli) {
-                        const rand = Math.floor(Math.random() * 12);
-                        el.classList.add(`plane-${rand}`);
-                    }
+            // Helicopters: category A7, or type starts with H, or very slow + low
+            const isHeli = category === 'A7'
+                || typecode.startsWith('H')
+                || (gs < 60 && (alt === 'ground' || (typeof alt === 'number' && alt < 1500)));
 
-                    const marker = new maplibregl.Marker({
-                        element: el,
-                        anchor: 'center',
-                        rotationAlignment: 'viewport',
-                        pitchAlignment: 'viewport'
-                        // NOTE: do NOT use `rotation` option here — we manage rotation via el.style.transform
-                    })
-                        .setLngLat([lng, lat])
-                        .addTo(map);
+            if (flightMarkers[id]) {
+                flightMarkers[id].marker.setLngLat([lng, lat]);
+                flightMarkers[id].el.style.transform = `rotate(${track}deg)`;
+                flightMarkers[id].lat = lat;
+                flightMarkers[id].lng = lng;
+                flightMarkers[id].velocity = gs;
+                flightMarkers[id].track = track;
+            } else {
+                const el = document.createElement('div');
+                el.className = isHeli ? 'heli-blip' : 'plane-blip';
+                el.style.transform = `rotate(${track}deg)`;
 
-                    flightMarkers[id] = { marker, el, lat, lng, velocity, track };
+                if (!isHeli) {
+                    const rand = Math.floor(Math.random() * 12);
+                    el.classList.add(`plane-${rand}`);
                 }
+
+                const marker = new maplibregl.Marker({
+                    element: el,
+                    anchor: 'center',
+                    rotationAlignment: 'viewport',
+                    pitchAlignment: 'viewport'
+                })
+                    .setLngLat([lng, lat])
+                    .addTo(map);
+
+                flightMarkers[id] = { marker, el, lat, lng, velocity: gs, track };
             }
         });
 
