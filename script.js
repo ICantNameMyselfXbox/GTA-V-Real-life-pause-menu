@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 playerMarker = new maplibregl.Marker({
                     element: playerMarkerEl,
-                    anchor: 'center', // CRITICAL for zoom stability
+                    anchor: 'center',
                     rotationAlignment: 'viewport',
                     pitchAlignment: 'viewport'
                 })
@@ -891,7 +891,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const marker = new maplibregl.Marker({
                 element: el,
-                anchor: 'center', // CRITICAL for zoom stability
+                anchor: 'center',
                 rotationAlignment: 'viewport',
                 pitchAlignment: 'viewport'
             })
