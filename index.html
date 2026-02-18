@@ -4,6 +4,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self';
+        script-src 'self' 'unsafe-inline' 'unsafe-eval'
+            https://unpkg.com
+            https://cdn.jsdelivr.net
+            https://peerjs.com;
+        style-src 'self' 'unsafe-inline'
+            https://fonts.googleapis.com
+            https://unpkg.com;
+        font-src 'self'
+            https://fonts.gstatic.com;
+        connect-src 'self'
+            https://opensky-network.org
+            https://api.allorigins.win
+            https://corsproxy.io
+            https://nominatim.openstreetmap.org
+            https://overpass-api.de
+            https://api.open-meteo.com
+            wss://0.peerjs.com
+            https://0.peerjs.com
+            https://stun.l.google.com:19302
+            https://tile.openstreetmap.org
+            https://*.basemaps.cartocdn.com;
+        img-src 'self' data: blob:
+            https://ui-avatars.com
+            https://*.tile.openstreetmap.org
+            https://*.basemaps.cartocdn.com;
+        worker-src blob:;
+    ">
     <title>GTA V Pause Menu</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
