@@ -1078,8 +1078,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 sliders[0].value = settings.volume || 80;
                 sliders[1].value = settings.brightness || 50;
                 sliders[2].value = settings.blipScale || 1.0;
+
                 // Apply scale immediately
                 document.documentElement.style.setProperty('--blip-scale', sliders[2].value);
+
+                // Update visuals for all loaded sliders
+                sliders.forEach(updateSliderVisuals);
             }
 
             // Flight Radar
@@ -1154,8 +1158,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+    function updateSliderVisuals(slider) {
+        const min = parseFloat(slider.min) || 0;
+        const max = parseFloat(slider.max) || 100;
+        const val = parseFloat(slider.value);
+        const percentage = ((val - min) / (max - min)) * 100;
+        slider.style.backgroundSize = `${percentage}% 100%`;
+    }
+
     sliders.forEach((slider, index) => {
+        // Initial visual update
+        updateSliderVisuals(slider);
+
         slider.addEventListener('input', () => {
+            updateSliderVisuals(slider);
+
             if (index === 2) { // Blip Scale Slider
                 const scale = slider.value;
                 document.documentElement.style.setProperty('--blip-scale', scale);
