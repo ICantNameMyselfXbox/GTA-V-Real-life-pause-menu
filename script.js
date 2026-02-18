@@ -322,6 +322,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 paint: {}
             });
 
+
+
+            // Initial scale application if settings loaded
+            const savedSettings = localStorage.getItem('gta_pause_settings');
+            if (savedSettings) {
+                const parsed = JSON.parse(savedSettings);
+                if (parsed.blipScale) {
+                    map.setLayoutProperty('airports-layer', 'icon-size', 0.7 * parsed.blipScale);
+                }
+            }
+
             // Toggle logic based on settings
             const toggle = document.getElementById('flight-radar-toggle');
             if (toggle) {
@@ -1030,7 +1041,8 @@ document.addEventListener('DOMContentLoaded', () => {
             volume: sliders[0].value,
             brightness: sliders[1].value,
             flightRadar: flightToggle ? flightToggle.checked : true,
-            showStores: storesToggle ? storesToggle.checked : true
+            showStores: storesToggle ? storesToggle.checked : true,
+            blipScale: sliders[2] ? sliders[2].value : 1.0
         };
         localStorage.setItem('gta_pause_settings', JSON.stringify(settings));
     }
@@ -1062,9 +1074,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Sliders
-            if (sliders.length >= 2) {
+            if (sliders.length >= 3) {
                 sliders[0].value = settings.volume || 80;
                 sliders[1].value = settings.brightness || 50;
+                sliders[2].value = settings.blipScale || 1.0;
+                // Apply scale immediately
+                document.documentElement.style.setProperty('--blip-scale', sliders[2].value);
             }
 
             // Flight Radar
@@ -1139,8 +1154,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-    sliders.forEach(slider => {
+    sliders.forEach((slider, index) => {
         slider.addEventListener('input', () => {
+            if (index === 2) { // Blip Scale Slider
+                const scale = slider.value;
+                document.documentElement.style.setProperty('--blip-scale', scale);
+                // Update Airport Layer (GeoJSON) - scaling 0.7 base
+                if (map && map.getLayer('airports-layer')) {
+                    map.setLayoutProperty('airports-layer', 'icon-size', 0.7 * scale);
+                }
+            }
             saveSettings();
         });
     });

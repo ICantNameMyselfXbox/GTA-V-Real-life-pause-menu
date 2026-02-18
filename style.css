@@ -1,5 +1,8 @@
 :root {
     --accent-color: #3498db;
+    --blip-scale: 1;
+    --blip-base-size: 28px;
+    --current-blip-size: calc(var(--blip-base-size) * var(--blip-scale));
 }
 
 /* Global Reset & Typography */
@@ -219,24 +222,25 @@ body {
 }
 
 .plane-blip::after {
-    width: 24px;
-    height: 24px;
-    top: -12px;
-    left: -12px;
+    width: var(--current-blip-size);
+    height: var(--current-blip-size);
+    top: calc(var(--current-blip-size) / -2);
+    left: calc(var(--current-blip-size) / -2);
     background-image: url('Blips/radar_player_plane.png');
 }
 
 .heli-blip::after {
-    width: 36px;
-    height: 36px;
-    top: -18px;
-    left: -18px;
+    /* Helis slightly larger visually, but can scale same or relative */
+    width: calc(var(--current-blip-size) * 1.2);
+    height: calc(var(--current-blip-size) * 1.2);
+    top: calc(var(--current-blip-size) * -0.6);
+    left: calc(var(--current-blip-size) * -0.6);
     background-image: url('Blips/radar_player_heli.gif');
 }
 
 .airport-blip {
-    width: 22px;
-    height: 22px;
+    width: var(--current-blip-size);
+    height: var(--current-blip-size);
     background-image: url('Blips/radar_airport.png');
     background-size: contain;
     background-repeat: no-repeat;
@@ -247,8 +251,8 @@ body {
 }
 
 .store-blip {
-    width: 20px;
-    height: 20px;
+    width: var(--current-blip-size);
+    height: var(--current-blip-size);
     background-image: url('Blips/radar_shop.png');
     background-size: contain;
     background-repeat: no-repeat;
@@ -271,10 +275,10 @@ body {
     content: '';
     display: block;
     position: absolute;
-    width: 36px;
-    height: 36px;
-    top: -18px;
-    left: -18px;
+    width: calc(var(--current-blip-size) * 1.2);
+    height: calc(var(--current-blip-size) * 1.2);
+    top: calc(var(--current-blip-size) * -0.6);
+    left: calc(var(--current-blip-size) * -0.6);
     background-image: url('Blips/cayo_perico.png');
     background-size: contain;
     background-repeat: no-repeat;
@@ -287,10 +291,10 @@ body {
     content: '';
     display: block;
     position: absolute;
-    width: 28px;
-    height: 28px;
-    top: -14px;
-    left: -14px;
+    width: var(--current-blip-size);
+    height: var(--current-blip-size);
+    top: calc(var(--current-blip-size) / -2);
+    left: calc(var(--current-blip-size) / -2);
     background-image: url('Blips/radar_sub.png');
     background-size: contain;
     background-repeat: no-repeat;
@@ -387,11 +391,11 @@ body {
 
 /* The actual visual icon */
 .blip-icon {
-    width: 24px;
-    height: 24px;
+    width: var(--current-blip-size);
+    height: var(--current-blip-size);
     position: absolute;
-    top: -12px;
-    left: -12px;
+    top: calc(var(--current-blip-size) / -2);
+    left: calc(var(--current-blip-size) / -2);
     background-size: contain;
     background-position: center;
     background-repeat: no-repeat;
