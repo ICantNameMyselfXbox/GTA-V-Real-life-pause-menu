@@ -221,6 +221,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('Connected to Lobby Hub');
                 if (statusEl) statusEl.innerText = "CONNECTED";
                 startHeartbeat(conn, myId);
+
+                // Receive relayed updates from the hub
+                conn.on('data', (data) => {
+                    if (data.type === 'POS_UPDATE') {
+                        updateOtherPlayer(data);
+                    }
+                });
             });
 
             conn.on('close', () => {
