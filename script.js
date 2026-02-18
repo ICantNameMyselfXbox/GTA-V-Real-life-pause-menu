@@ -162,6 +162,34 @@ document.addEventListener('DOMContentLoaded', () => {
         }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
     }
 
+    // --- Network Awareness (Mobile Data / WiFi switching) ---
+    window.addEventListener('online', () => {
+        console.log("+++ Network back ONLINE. Reconnecting multiplayer... +++");
+        const statusEl = document.querySelector('.connection-status');
+        if (statusEl) statusEl.innerText = "NETWORK RESTORED - RECONNECTING...";
+
+        // Reset flags to allow fresh init
+        isMultiplayerTransitioning = false;
+        multiplayerInitialized = false;
+
+        // Re-trigger multiplayer logic with current position
+        if (userPos.lat !== 0) {
+            initMultiplayer(userPos.lat, userPos.lng);
+            multiplayerInitialized = true;
+        }
+    });
+
+    window.addEventListener('offline', () => {
+        console.log("--- Network OFFLINE. Connections paused. ---");
+        const statusEl = document.querySelector('.connection-status');
+        if (statusEl) statusEl.innerText = "OFFLINE - CHECK CONNECTION";
+
+        if (currentPeer) {
+            currentPeer.destroy();
+            currentPeer = null;
+        }
+    });
+
     async function fetchLocationName(lat, lng) {
         try {
             // Nominatim requires a User-Agent or Referer header
