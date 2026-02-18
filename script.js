@@ -486,21 +486,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // corsproxy.io returns the raw response body (no wrapper)
-            const data = await response.json();
+            // Read raw text first so we can log/debug on parse failure
+            const rawText = await response.text();
+
+            let data;
+            try {
+                data = JSON.parse(rawText);
+            } catch (parseErr) {
+                console.warn('[RADAR] Bad JSON from proxy. Raw response:', rawText.slice(0, 300));
+                scheduleNextFlightFetch(flightCooldown);
+                return;
+            }
 
             if (data && data.states) {
                 console.log(`[RADAR] ✈ Found ${data.states.length} aircraft.`);
                 flightCooldown = 60000; // reset on success
                 updateFlightBlips(data.states);
-            } else if (data && data.message && data.message.includes('rate limit')) {
+            } else if (data && ((data.message && data.message.includes('rate limit')) || data.error)) {
                 flightCooldown = Math.min(flightCooldown * 2, 600000);
-                console.warn(`[RADAR] Rate limited. Next fetch in ${flightCooldown / 1000}s.`);
+                console.warn(`[RADAR] Rate limited / proxy error. Next fetch in ${flightCooldown / 1000}s. Response:`, data);
                 clearFlightBlips();
             } else {
-                console.log('[RADAR] No aircraft in this region.');
+                console.log('[RADAR] No aircraft in this region. Response:', data);
                 clearFlightBlips();
             }
+
         } catch (error) {
             console.warn('[RADAR] Fetch failed:', error.message);
         }
