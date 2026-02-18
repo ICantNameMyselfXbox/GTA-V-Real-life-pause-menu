@@ -112,6 +112,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const playerMarkerEl = document.createElement('div');
                 playerMarkerEl.className = 'player-blip';
 
+                // Create the visible icon
+                const icon = document.createElement('div');
+                icon.className = 'blip-icon';
+                playerMarkerEl.appendChild(icon);
+
                 // Create Name Tag for self
                 const nameTag = document.createElement('span');
                 nameTag.className = 'blip-name-tag';
@@ -128,7 +133,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     e.stopPropagation();
                 });
 
-                playerMarker = new maplibregl.Marker({ element: playerMarkerEl })
+                playerMarker = new maplibregl.Marker({
+                    element: playerMarkerEl,
+                    anchor: 'center' // CRITICAL for zoom stability
+                })
                     .setLngLat([lng, lat])
                     .addTo(map);
 
@@ -432,7 +440,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const marker = new maplibregl.Marker({
                         element: el,
-                        rotation: track
+                        rotation: track,
+                        anchor: 'center'
                     })
                         .setLngLat([lng, lat])
                         .addTo(map);
@@ -529,7 +538,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     markerEl.className = 'store-blip';
                     markerEl.title = name;
 
-                    const marker = new maplibregl.Marker({ element: markerEl })
+                    const marker = new maplibregl.Marker({
+                        element: markerEl,
+                        anchor: 'center'
+                    })
                         .setLngLat([lon, lat])
                         .addTo(map);
 
@@ -841,6 +853,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const el = document.createElement('div');
             el.className = 'other-blip';
 
+            // Create the visible icon
+            const icon = document.createElement('div');
+            icon.className = 'blip-icon';
+            el.appendChild(icon);
+
             // Create Name Tag
             const nameTag = document.createElement('span');
             nameTag.className = 'blip-name-tag';
@@ -864,7 +881,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 e.stopPropagation();
             });
 
-            const marker = new maplibregl.Marker({ element: el })
+            const marker = new maplibregl.Marker({
+                element: el,
+                anchor: 'center' // CRITICAL for zoom stability
+            })
                 .setLngLat([data.lng, data.lat])
                 .addTo(map);
 

@@ -261,31 +261,42 @@ body {
     }
 }
 
-.player-blip {
-    background-image: url('Blips/Player.png');
-    background-size: cover;
+.player-blip,
+.other-blip {
+    width: 32px;
+    height: 32px;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+/* The actual visual icon */
+.blip-icon {
     width: 30px;
     height: 30px;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    flex-shrink: 0;
+}
+
+.player-blip .blip-icon {
+    background-image: url('Blips/Player.png');
     border-radius: 50%;
-    /* Optional if png is round, but good for safety */
     animation: flash 1s infinite;
 }
 
-.other-blip {
+.other-blip .blip-icon {
     background-image: url('Blips/Others.png');
-    background-size: cover;
-    width: 30px;
-    height: 30px;
-    position: relative;
-    /* For name tag alignment */
-    cursor: pointer;
 }
 
 /* GTA Online Style Name Tags */
 .blip-name-tag {
     position: absolute;
     left: 110%;
-    /* To the right of the blip */
     top: 50%;
     transform: translateY(-50%);
     background: rgba(0, 0, 0, 0.9);
@@ -301,23 +312,6 @@ body {
     transition: opacity 0.15s ease;
     border-left: 3px solid var(--accent-color);
     z-index: 1000;
-}
-
-.other-blip:hover .blip-name-tag,
-.other-blip:active .blip-name-tag,
-.other-blip.show-name .blip-name-tag {
-    opacity: 1;
-}
-
-.player-blip {
-    background-image: url('Blips/Player.png');
-    background-size: cover;
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    position: relative;
-    cursor: pointer;
-    animation: flash 1s infinite;
 }
 
 .other-blip:hover .blip-name-tag,
