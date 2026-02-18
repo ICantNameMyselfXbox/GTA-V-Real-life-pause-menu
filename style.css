@@ -219,24 +219,24 @@ body {
 }
 
 .plane-blip::after {
-    width: 32px;
-    height: 32px;
-    top: -16px;
-    left: -16px;
+    width: 24px;
+    height: 24px;
+    top: -12px;
+    left: -12px;
     background-image: url('Blips/radar_player_plane.png');
 }
 
 .heli-blip::after {
-    width: 48px;
-    height: 48px;
-    top: -24px;
-    left: -24px;
+    width: 36px;
+    height: 36px;
+    top: -18px;
+    left: -18px;
     background-image: url('Blips/radar_player_heli.gif');
 }
 
 .airport-blip {
-    width: 28px;
-    height: 28px;
+    width: 22px;
+    height: 22px;
     background-image: url('Blips/radar_airport.png');
     background-size: contain;
     background-repeat: no-repeat;
@@ -247,8 +247,8 @@ body {
 }
 
 .store-blip {
-    width: 26px;
-    height: 26px;
+    width: 20px;
+    height: 20px;
     background-image: url('Blips/radar_shop.png');
     background-size: contain;
     background-repeat: no-repeat;
@@ -271,10 +271,10 @@ body {
     content: '';
     display: block;
     position: absolute;
-    width: 48px;
-    height: 48px;
-    top: -24px;
-    left: -24px;
+    width: 36px;
+    height: 36px;
+    top: -18px;
+    left: -18px;
     background-image: url('Blips/cayo_perico.png');
     background-size: contain;
     background-repeat: no-repeat;
@@ -287,10 +287,10 @@ body {
     content: '';
     display: block;
     position: absolute;
-    width: 36px;
-    height: 36px;
-    top: -18px;
-    left: -18px;
+    width: 28px;
+    height: 28px;
+    top: -14px;
+    left: -14px;
     background-image: url('Blips/radar_sub.png');
     background-size: contain;
     background-repeat: no-repeat;
@@ -387,11 +387,11 @@ body {
 
 /* The actual visual icon */
 .blip-icon {
-    width: 32px;
-    height: 32px;
+    width: 24px;
+    height: 24px;
     position: absolute;
-    top: -16px;
-    left: -16px;
+    top: -12px;
+    left: -12px;
     background-size: contain;
     background-position: center;
     background-repeat: no-repeat;

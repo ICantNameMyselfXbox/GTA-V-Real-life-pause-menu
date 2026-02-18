@@ -324,20 +324,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 source: 'airports',
                 layout: {
                     'icon-image': 'airport-icon',
-                    'icon-size': 0.8,
+                    'icon-size': 0.7,
                     'icon-allow-overlap': true,
-                    'text-field': ['get', 'name'],
-                    'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
-                    'text-offset': [0, 1.25],
-                    'text-anchor': 'top',
-                    'text-size': 12,
                     'visibility': 'visible'
                 },
-                paint: {
-                    'text-color': '#ffffff',
-                    'text-halo-color': '#000000',
-                    'text-halo-width': 1
-                }
+                paint: {}
             });
 
             // Toggle logic based on settings
