@@ -189,9 +189,11 @@ body {
 }
 
 .connection-status {
-    font-size: 0.8rem;
+    font-size: 0.9rem;
     color: var(--accent-color);
     letter-spacing: 1px;
+    font-weight: bold;
+    text-transform: uppercase;
 }
 
 @keyframes flash {
