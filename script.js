@@ -222,6 +222,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let worldSyncInterval = null; // Track sync interval to avoid duplicates
     let isMultiplayerTransitioning = false; // Guard against refresh loops
 
+    // --- SESSION PERSISTENCE (Fixes Ghost Blips) ---
+    let mySessionId = localStorage.getItem('gta_session_id');
+    if (!mySessionId) {
+        mySessionId = 'PLAYER-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+        localStorage.setItem('gta_session_id', mySessionId);
+    }
+    console.log("+++ Session ID Assigned:", mySessionId, "+++");
+
     // API Throttling
     let lastFetchTimes = {
         flights: 0,
@@ -560,7 +568,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     { urls: 'stun:stun2.l.google.com:19302' },
                     { urls: 'stun:stun3.l.google.com:19302' },
                     { urls: 'stun:stun4.l.google.com:19302' },
-                    { urls: 'stun:global.stun.twilio.com:3478' }
+                    { urls: 'stun:global.stun.twilio.com:3478' },
+                    // --- TURN SERVER (Paste Relay Credentials here for 100% Mobile/4G coverage) ---
+                    // { urls: 'turn:YOUR_TURN_URL', username: 'USERNAME', credential: 'PASSWORD' }
                 ]
             }
         };
@@ -624,6 +634,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             if (id !== myPeerId) {
                                 updateOtherPlayer({
                                     peerId: id,
+                                    sessionId: data.players[id].sessionId,
                                     lat: data.players[id].lat,
                                     lng: data.players[id].lng,
                                     name: data.players[id].name
@@ -688,6 +699,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Add Hub's own position
                     worldData.players[hubId] = {
+                        sessionId: mySessionId,
                         lat: userPos.lat,
                         lng: userPos.lng,
                         name: document.querySelector('.username').innerText
@@ -696,6 +708,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Add all other connected players
                     for (let id in otherPlayers) {
                         worldData.players[id] = {
+                            sessionId: otherPlayers[id].sessionId,
                             lat: otherPlayers[id].lat,
                             lng: otherPlayers[id].lng,
                             name: otherPlayers[id].name
@@ -753,6 +766,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     conn.send({
                         type: 'POS_UPDATE',
                         peerId: myId,
+                        sessionId: mySessionId,
                         lat: userPos.lat,
                         lng: userPos.lng,
                         name: document.querySelector('.username').innerText
@@ -773,23 +787,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateOtherPlayer(data) {
-        const id = data.peerId || data.id;
+        const id = data.sessionId || data.peerId || data.id;
 
         // --- GHOST PROTECTION GUARDS ---
         if (!id || id === "undefined" || id === "null") return;
-        if (id === myPeerId) return; // Don't draw ourselves
+        if (id === mySessionId) return; // Never draw ourselves
 
-        // Don't draw blips at 0,0 (common default before GPS/Net kicks in)
+        // Don't draw blips at 0,0
         if (Math.abs(data.lat) < 0.0001 && Math.abs(data.lng) < 0.0001) return;
+
+        // Proximity Guard: If blip is within ~1 meter of us, it's probably a stale version of us
+        const dist = Math.sqrt(Math.pow(data.lat - userPos.lat, 2) + Math.pow(data.lng - userPos.lng, 2));
+        if (dist < 0.00001) return;
 
         if (otherPlayers[id]) {
             otherPlayers[id].marker.setLngLat([data.lng, data.lat]);
             otherPlayers[id].lat = data.lat;
             otherPlayers[id].lng = data.lng;
-            otherPlayers[id].name = data.name || data.peerId || "Unknown Player";
+            otherPlayers[id].name = data.name || "Unknown Player";
+            otherPlayers[id].sessionId = data.sessionId;
             otherPlayers[id].lastUpdate = Date.now();
         } else {
-            console.log('New player detected on map:', id);
+            console.log('New player detected (Session ID):', id);
             const el = document.createElement('div');
             el.className = 'other-blip';
 
@@ -802,6 +821,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 lat: data.lat,
                 lng: data.lng,
                 name: data.name,
+                sessionId: data.sessionId,
                 lastUpdate: Date.now()
             };
         }
