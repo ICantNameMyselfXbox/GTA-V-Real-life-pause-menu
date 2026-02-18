@@ -610,6 +610,13 @@ body {
     color: #000;
 }
 
+/* BUG 8 FIX: inputs inside hovered row were white-on-white; make them readable */
+.setting-item:hover input,
+.setting-item:hover .setting-toggle,
+.setting-item:hover .connection-status {
+    color: #000;
+}
+
 .setting-item label {
     font-size: 1.2rem;
     text-transform: uppercase;

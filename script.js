@@ -212,12 +212,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchLocationName(lat, lng) {
         try {
-            // Nominatim requires a User-Agent or Referer header
-            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`, {
-                headers: {
-                    'User-Agent': 'GTA-V-Pause-Menu-Recreation'
-                }
-            });
+            // BUG 6 FIX: 'User-Agent' is a forbidden browser header and is silently dropped — removed
+            const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`);
             const data = await response.json();
             const city = data.address.city || data.address.town || data.address.village || data.address.suburb || data.address.county || "San Andreas";
 
@@ -241,6 +237,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let radarServiceInitialised = false; // New safety flag
     let worldSyncInterval = null; // Track sync interval to avoid duplicates
     let isMultiplayerTransitioning = false; // Guard against refresh loops
+    let heartbeatInterval = null; // BUG 5 FIX: track heartbeat so it can be cleared on reconnect
+    let volSlider = null; // BUG 1 FIX: hoist volSlider to outer scope so saveSettings() can access it
 
     // --- SESSION PERSISTENCE (Fixes Ghost Blips) ---
     let mySessionId = sessionStorage.getItem('gta_session_id');
@@ -285,6 +283,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Track Distance on Move
     map.on('moveend', () => {
+        // BUG 3 FIX: guard against turf not being loaded yet
+        if (typeof turf === 'undefined') return;
         const center = map.getCenter();
         if (lastMapPos) {
             const from = turf.point([lastMapPos.lng, lastMapPos.lat]);
@@ -418,7 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function predictFlights() {
-        const deltaT = 0.1; // 100ms in seconds
+        const deltaT = 0.25; // BUG 2 FIX: interval is 250ms, so deltaT must be 0.25s
         const degM = 111111; // Approx meters per degree
 
         for (let id in flightMarkers) {
@@ -523,7 +523,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (flightMarkers[id]) {
                     flightMarkers[id].marker.setLngLat([lng, lat]);
-                    flightMarkers[id].marker.setRotation(track);
+                    // BUG 4 FIX: MapLibre Marker has no setRotation(); apply via CSS transform on the element
+                    flightMarkers[id].el.style.transform = `rotate(${track}deg)`;
                     // Update state for prediction
                     flightMarkers[id].lat = lat;
                     flightMarkers[id].lng = lng;
@@ -914,8 +915,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
 
+            // BUG 5 FIX: clear any previous heartbeat before starting a new one
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
             sendUpdate();
-            setInterval(sendUpdate, 3000);
+            heartbeatInterval = setInterval(sendUpdate, 3000);
         }
 
         // Shared peer listener
@@ -1063,7 +1066,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             const desc = {
                 0: 'Clear Sky', 1: 'Mainly Clear', 2: 'Partly Cloudy', 3: 'Overcast',
-                45: 'Foggy', 51: 'Drizzle', 61: 'Rainy', 71: 'Snowy', 95: 'Thunderstorm'
+                45: 'Foggy', 48: 'Freezing Fog', 51: 'Drizzle', 61: 'Rainy', 71: 'Snowy', 95: 'Thunderstorm' // BUG 7 FIX: added missing code 48
             };
             return {
                 icon: icons[code] || '❓',
@@ -1156,7 +1159,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Sliders
-            const volSlider = document.getElementById('volume-slider');
+            // BUG 1 FIX: volSlider is now hoisted to outer scope; assign here instead of re-declaring
+            volSlider = document.getElementById('volume-slider');
             const blipSlider = document.getElementById('blip-scale-slider');
 
             if (volSlider) {
