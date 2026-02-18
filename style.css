@@ -257,6 +257,48 @@ body {
     cursor: help;
 }
 
+/* Static World Blips */
+.cayo-blip,
+.sub-blip {
+    width: 0;
+    height: 0;
+    position: relative;
+    pointer-events: none;
+    display: block;
+}
+
+.cayo-blip::after {
+    content: '';
+    display: block;
+    position: absolute;
+    width: 48px;
+    height: 48px;
+    top: -24px;
+    left: -24px;
+    background-image: url('Blips/cayo_perico.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.8));
+    opacity: 0.95;
+}
+
+.sub-blip::after {
+    content: '';
+    display: block;
+    position: absolute;
+    width: 36px;
+    height: 36px;
+    top: -18px;
+    left: -18px;
+    background-image: url('Blips/radar_sub.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.8));
+    opacity: 0.95;
+}
+
 /* Plane variants - assigned via JS class */
 .plane-blip.plane-0::after {
     background-image: url('Blips/radar_player_plane.png');

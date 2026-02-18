@@ -172,10 +172,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (map.isStyleLoaded()) {
                     startFlightRadar();
                     initStaticMapLayers();
+                    initStaticBlips();
                 } else {
                     map.once('load', () => {
                         startFlightRadar();
                         initStaticMapLayers();
+                        initStaticBlips();
                     });
                     // Mark as started now so we don't attach multiple listeners
                     flightRadarStarted = true;
@@ -346,6 +348,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     map.setLayoutProperty('airports-layer', 'visibility', e.target.checked ? 'visible' : 'none');
                 });
             }
+        });
+    }
+
+    function initStaticBlips() {
+        if (!map) return;
+
+        const staticBlips = [
+            { lat: 12.717345414467312, lng: -61.32379360419957, cls: 'cayo-blip', title: 'Cayo Perico' },
+            { lat: 12.714661399942797, lng: -61.313049102971064, cls: 'sub-blip', title: 'Kosatka Submarine' }
+        ];
+
+        staticBlips.forEach(({ lat, lng, cls, title }) => {
+            const el = document.createElement('div');
+            el.className = cls;
+            el.title = title;
+
+            new maplibregl.Marker({
+                element: el,
+                anchor: 'center',
+                rotationAlignment: 'viewport',
+                pitchAlignment: 'viewport'
+            })
+                .setLngLat([lng, lat])
+                .addTo(map);
         });
     }
 
