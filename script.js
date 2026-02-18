@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("+++ GTA V Pause Menu v1.3.5 Loaded +++");
     // --- Audio Setup ---
     const sounds = {
         changeOption: new Audio('sfx and music/changeoption.mp3'),
@@ -139,6 +140,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 coordText.innerText = `${ns} ${Math.abs(lat).toFixed(4)}°  ${ew} ${Math.abs(lng).toFixed(4)}°`;
             }
 
+            if (!flightRadarStarted) {
+                // Check if map is ready, if not wait for load
+                if (map.isStyleLoaded()) {
+                    startFlightRadar();
+                } else {
+                    map.once('load', () => startFlightRadar());
+                    // Mark as started now so we don't attach multiple listeners
+                    flightRadarStarted = true;
+                }
+            }
+
         }, error => {
             console.error("Geolocation error:", error);
             const locName = document.querySelector('.location-name');
@@ -168,10 +180,361 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let otherPlayers = {}; // { peerId: { marker, lat, lng } }
     let currentPeer = null;
+    let myPeerId = null; // Store local ID to avoid self-blips
     let connections = []; // Track connections if we are the hub
     let flightMarkers = {};
     let flightRadarStarted = false;
+    let airportMarkers = {};
+    let storeMarkers = {};
     let userPos = { lat: 0, lng: 0 }; // Global tracking
+    let radarServiceInitialised = false; // New safety flag
+
+    // API Throttling
+    let lastFetchTimes = {
+        flights: 0,
+        airports: 0,
+        stores: 0
+    };
+
+
+    // --- FLIGHT RADAR LOGIC (GLOBAL) ---
+    function startFlightRadar() {
+        if (radarServiceInitialised) return;
+        radarServiceInitialised = true;
+        flightRadarStarted = true; // Ensure both flags are set
+
+        console.log("+++ Flight Radar Service starting (Throttled 30s) +++");
+        fetchFlights();
+        setInterval(fetchFlights, 30000); // Increased to 30s for rate safety
+
+        // Start Predictive Glide Loop (every 100ms)
+        setInterval(predictFlights, 100);
+
+        // Map events for airports (Debounced)
+        let moveTimeout;
+        map.on('moveend', () => {
+            console.log("Map moved, refreshing airports/flights...");
+            clearTimeout(moveTimeout);
+            moveTimeout = setTimeout(() => {
+                // Throttled refresh on move
+                const now = Date.now();
+                if (now - lastFetchTimes.flights > 5000) fetchFlights();
+                if (now - lastFetchTimes.airports > 10000) fetchAirports();
+                if (now - lastFetchTimes.stores > 5000) fetchStores();
+            }, 1000);
+        });
+
+        // Initial fetch
+        fetchAirports();
+        fetchStores();
+    }
+
+    function predictFlights() {
+        const deltaT = 0.1; // 100ms in seconds
+        const degM = 111111; // Approx meters per degree
+
+        for (let id in flightMarkers) {
+            const f = flightMarkers[id];
+            if (f.velocity && f.velocity > 0) {
+                // Approximate dead reckoning
+                const rad = (f.track - 90) * (Math.PI / 180); // Adjusting for polar coords
+                const dx = Math.cos(rad) * f.velocity * deltaT;
+                const dy = -Math.sin(rad) * f.velocity * deltaT; // Lat decreases as we go "South"
+
+                f.lat += dy / degM;
+                f.lng += dx / (degM * Math.cos(f.lat * Math.PI / 180));
+
+                f.marker.setLngLat([f.lng, f.lat]);
+            }
+        }
+    }
+
+    async function fetchFlights() {
+        const toggle = document.getElementById('flight-radar-toggle');
+        if (toggle && !toggle.checked) {
+            clearFlightBlips();
+            return;
+        }
+
+        if (!map || !map.getStyle()) return;
+
+        try {
+            const bounds = map.getBounds();
+            if (!bounds || typeof bounds.getSouth !== 'function') return;
+
+            const lamin = bounds.getSouth();
+            const lomin = bounds.getWest();
+            const lamax = bounds.getNorth();
+            const lomax = bounds.getEast();
+
+            if (lamin === undefined || lomin === undefined) return;
+
+            const url = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
+
+            lastFetchTimes.flights = Date.now();
+            const response = await fetch(url);
+
+            if (response.status === 429) {
+                console.warn("[RADAR] Flight API Rate Limited. Increasing cooldown.");
+                lastFetchTimes.flights += 60000; // Block for 1 min
+                return;
+            }
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+
+            if (data && data.states) {
+                console.log(`[RADAR] Found ${data.states.length} aircraft in view.`);
+                updateFlightBlips(data.states);
+            } else {
+                console.log("[RADAR] No aircraft detected in this region right now.");
+                clearFlightBlips();
+            }
+        } catch (error) {
+            console.warn("[RADAR] Data fetch failed (API might be rate-limited):", error);
+        }
+    }
+
+    function updateFlightBlips(states) {
+        const seenIds = new Set();
+
+        states.forEach(state => {
+            const id = state[0];
+            const lng = state[5];
+            const lat = state[6];
+            const track = state[10] || 0;
+            const velocity = state[9] || 0;
+
+            if (lat && lng) {
+                seenIds.add(id);
+                const isHeli = velocity < 60 && state[7] < 1000;
+
+                if (flightMarkers[id]) {
+                    flightMarkers[id].marker.setLngLat([lng, lat]);
+                    flightMarkers[id].marker.setRotation(track);
+                    // Update state for prediction
+                    flightMarkers[id].lat = lat;
+                    flightMarkers[id].lng = lng;
+                    flightMarkers[id].velocity = velocity;
+                    flightMarkers[id].track = track;
+                } else {
+                    const el = document.createElement('div');
+                    el.className = isHeli ? 'heli-blip' : 'plane-blip';
+
+                    // Randomize plane icons if it's a plane
+                    if (!isHeli) {
+                        const rand = Math.floor(Math.random() * 12);
+                        const assetName = rand === 0 ? 'radar_player_plane.png' : `radar_player_plane${rand}.png`;
+                        el.style.backgroundImage = `url('Blips/${assetName}')`;
+                    }
+
+                    const marker = new maplibregl.Marker({
+                        element: el,
+                        rotation: track
+                    })
+                        .setLngLat([lng, lat])
+                        .addTo(map);
+
+                    flightMarkers[id] = {
+                        marker,
+                        el,
+                        lat,
+                        lng,
+                        velocity,
+                        track
+                    };
+                }
+            }
+        });
+
+        // Cleanup
+        for (let id in flightMarkers) {
+            if (!seenIds.has(id)) {
+                flightMarkers[id].marker.remove();
+                delete flightMarkers[id];
+            }
+        }
+    }
+
+    function clearFlightBlips() {
+        for (let id in flightMarkers) {
+            flightMarkers[id].marker.remove();
+        }
+        flightMarkers = {};
+        clearAirportBlips();
+    }
+
+    async function fetchAirports() {
+        const toggle = document.getElementById('flight-radar-toggle');
+        if (toggle && !toggle.checked) {
+            clearAirportBlips();
+            return;
+        }
+
+        if (!map || !map.getStyle() || map.getZoom() < 4) {
+            clearAirportBlips();
+            return;
+        }
+
+        try {
+            const bounds = map.getBounds();
+            const query = `
+                [out:json][timeout:25];
+                (
+                  node["aeroway"="aerodrome"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
+                  way["aeroway"="aerodrome"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
+                  relation["aeroway"="aerodrome"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
+                );
+                out center;`;
+
+
+            const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+
+            lastFetchTimes.airports = Date.now();
+            const response = await fetch(url);
+
+            if (response.status === 429) {
+                console.warn("[AIRPORTS] Overpass Rate Limited. Increasing cooldown.");
+                lastFetchTimes.airports += 60000; // Block for 1 min
+                return;
+            }
+            const data = await response.json();
+
+            if (data && data.elements) {
+                console.log(`[AIRPORTS] Found ${data.elements.length} airports in view.`);
+                updateAirportBlips(data.elements);
+            }
+        } catch (error) {
+            console.warn("[AIRPORTS] Overpass API failed:", error);
+        }
+    }
+
+    function updateAirportBlips(elements) {
+        const seenIds = new Set();
+
+        elements.forEach(el => {
+            const id = el.id;
+            const lat = el.lat || (el.center && el.center.lat);
+            const lon = el.lon || (el.center && el.center.lon);
+            const name = (el.tags && el.tags.name) || "Airport";
+
+            if (lat && lon) {
+                seenIds.add(id);
+                if (!airportMarkers[id]) {
+                    const markerEl = document.createElement('div');
+                    markerEl.className = 'airport-blip';
+                    markerEl.title = name;
+
+                    const marker = new maplibregl.Marker({ element: markerEl })
+                        .setLngLat([lon, lat])
+                        .addTo(map);
+
+                    airportMarkers[id] = { marker, name };
+                }
+            }
+        });
+
+        // Cleanup
+        for (let id in airportMarkers) {
+            if (!seenIds.has(id)) {
+                airportMarkers[id].marker.remove();
+                delete airportMarkers[id];
+            }
+        }
+    }
+
+    function clearAirportBlips() {
+        for (let id in airportMarkers) {
+            airportMarkers[id].marker.remove();
+        }
+        airportMarkers = {};
+    }
+
+    async function fetchStores() {
+        const toggle = document.getElementById('stores-toggle');
+        if (toggle && !toggle.checked) {
+            clearStoreBlips();
+            return;
+        }
+
+        if (!map || !map.getStyle() || map.getZoom() < 12) {
+            clearStoreBlips();
+            return;
+        }
+
+        try {
+            const bounds = map.getBounds();
+            const query = `
+                [out:json][timeout:25];
+                (
+                  node["shop"~"convenience|supermarket|liquor|clothes"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
+                  way["shop"~"convenience|supermarket|liquor|clothes"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
+                  node["amenity"="fuel"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
+                  way["amenity"="fuel"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
+                );
+                out center;`;
+
+
+            const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+
+            lastFetchTimes.stores = Date.now();
+            const response = await fetch(url);
+
+            if (response.status === 429) {
+                console.warn("[STORES] Store API Rate Limited. Increasing cooldown.");
+                lastFetchTimes.stores += 60000; // Block for 1 min
+                return;
+            }
+            const data = await response.json();
+
+            if (data && data.elements) {
+                console.log(`[STORES] Found ${data.elements.length} stores in view.`);
+                updateStoreBlips(data.elements);
+            }
+        } catch (error) {
+            console.warn("[STORES] Overpass API failed:", error);
+        }
+    }
+
+    function updateStoreBlips(elements) {
+        const seenIds = new Set();
+
+        elements.forEach(el => {
+            const id = el.id;
+            const lat = el.lat || (el.center && el.center.lat);
+            const lon = el.lon || (el.center && el.center.lon);
+            const name = (el.tags && el.tags.name) || "Store";
+
+            if (lat && lon) {
+                seenIds.add(id);
+                if (!storeMarkers[id]) {
+                    const markerEl = document.createElement('div');
+                    markerEl.className = 'store-blip';
+                    markerEl.title = name;
+
+                    const marker = new maplibregl.Marker({ element: markerEl })
+                        .setLngLat([lon, lat])
+                        .addTo(map);
+
+                    storeMarkers[id] = { marker, name };
+                }
+            }
+        });
+
+        // Cleanup
+        for (let id in storeMarkers) {
+            if (!seenIds.has(id)) {
+                storeMarkers[id].marker.remove();
+                delete storeMarkers[id];
+            }
+        }
+    }
+
+    function clearStoreBlips() {
+        for (let id in storeMarkers) {
+            storeMarkers[id].marker.remove();
+        }
+        storeMarkers = {};
+    }
 
     function initMultiplayer(lat, lng) {
         userPos.lat = lat;
@@ -190,10 +553,6 @@ document.addEventListener('DOMContentLoaded', () => {
             config: {
                 iceServers: [
                     { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                    { urls: 'stun:stun2.l.google.com:19302' },
-                    { urls: 'stun:stun3.l.google.com:19302' },
-                    { urls: 'stun:stun4.l.google.com:19302' },
                     { urls: 'stun:global.stun.twilio.com:3478' }
                 ]
             }
@@ -209,15 +568,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         peer.on('open', (myId) => {
             console.log('My Peer ID:', myId);
+            myPeerId = myId; // Save globally
             if (peerIdEl) peerIdEl.innerText = myId;
             if (statusEl) statusEl.innerText = "JOINING GLOBAL LOBBY...";
             attemptConnect(hubId, myId, peer);
-
-            // Start flight radar safely
-            if (userPos.lat !== 0 && !flightRadarStarted) {
-                startFlightRadar();
-                flightRadarStarted = true;
-            }
         });
 
         function attemptConnect(targetId, myId, peerRef) {
@@ -247,7 +601,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (data.type === 'WORLD_SYNC') {
                         // Batch update all other players from the host's master state
                         for (let id in data.players) {
-                            if (id !== myId) {
+                            if (id !== myPeerId) {
                                 updateOtherPlayer({
                                     peerId: id,
                                     lat: data.players[id].lat,
@@ -277,71 +631,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // --- FLIGHT RADAR LOGIC ---
-        let flightMarkers = {};
+        // --- PREVIOUS POSITION OF LOGIC MOVED OUTSIDE ---
 
-        function startFlightRadar() {
-            fetchFlights();
-            setInterval(fetchFlights, 15000); // 15s refresh for OpenSky API
-        }
-
-        async function fetchFlights() {
-            try {
-                // Fetch aircraft within ~50km box
-                const offset = 0.5;
-                const url = `https://opensky-network.org/api/states/all?lamin=${userPos.lat - offset}&lomin=${userPos.lng - offset}&lamax=${userPos.lat + offset}&lomax=${userPos.lng + offset}`;
-
-                const response = await fetch(url);
-                const data = await response.json();
-
-                if (data && data.states) {
-                    updateFlightBlips(data.states);
-                }
-            } catch (error) {
-                console.warn("Flight Radar failed (too many requests?):", error);
-            }
-        }
-
-        function updateFlightBlips(states) {
-            const seenIds = new Set();
-
-            states.forEach(state => {
-                const id = state[0]; // ICAO24
-                const lng = state[5];
-                const lat = state[6];
-                const track = state[10] || 0; // True Track
-                const velocity = state[9] || 0;
-
-                if (lat && lng) {
-                    seenIds.add(id);
-                    // Guess if it's a helicopter or plane (Heli: Slow and low)
-                    const isHeli = velocity < 60 && state[7] < 1000;
-
-                    if (flightMarkers[id]) {
-                        flightMarkers[id].marker.setLngLat([lng, lat]);
-                        flightMarkers[id].el.style.transform = `rotate(${track}deg)`;
-                    } else {
-                        const el = document.createElement('div');
-                        el.className = isHeli ? 'heli-blip' : 'plane-blip';
-                        el.style.transform = `rotate(${track}deg)`;
-
-                        const marker = new maplibregl.Marker({ element: el })
-                            .setLngLat([lng, lat])
-                            .addTo(map);
-
-                        flightMarkers[id] = { marker, el };
-                    }
-                }
-            });
-
-            // Cleanup flights that left the area
-            for (let id in flightMarkers) {
-                if (!seenIds.has(id)) {
-                    flightMarkers[id].marker.remove();
-                    delete flightMarkers[id];
-                }
-            }
-        }
+        // --- END OF MOVED LOGIC ---
 
         function becomeHub() {
             if (statusEl) statusEl.innerText = "LOBBY ACTIVE (RELAY)";
@@ -351,6 +643,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             hubPeer.on('open', () => {
                 console.log('+++ GLOBAL LOBBY RELAY ACTIVE +++');
+                myPeerId = hubId; // CRITICAL
+
+                // Clear old state when becoming hub
+                for (let id in otherPlayers) {
+                    otherPlayers[id].marker.remove();
+                }
+                otherPlayers = {};
+
+                if (peerIdEl) peerIdEl.innerText = hubId;
 
                 // MASTER WORLD SYNC: Send the state of EVERYONE to EVERYBODY every 3s
                 setInterval(() => {
@@ -445,7 +746,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function updateOtherPlayer(data) {
         const id = data.peerId || data.id;
+
+        // CRITICAL: Don't draw ourselves!
+        if (id === myPeerId) return;
+
         if (otherPlayers[id]) {
+            console.log(`[PLAYER] Updating position for: ${data.name || id}`);
             otherPlayers[id].marker.setLngLat([data.lng, data.lat]);
             otherPlayers[id].lat = data.lat;
             otherPlayers[id].lng = data.lng;
@@ -550,12 +856,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const sliders = document.querySelectorAll('.gta-slider');
 
     function saveSettings() {
+        const flightToggle = document.getElementById('flight-radar-toggle');
+        const storesToggle = document.getElementById('stores-toggle');
         const settings = {
             username: usernameInput.value,
             accentColor: colorInput.value,
             avatar: document.querySelector('.avatar').src,
             volume: sliders[0].value,
-            brightness: sliders[1].value
+            brightness: sliders[1].value,
+            flightRadar: flightToggle ? flightToggle.checked : true,
+            showStores: storesToggle ? storesToggle.checked : true
         };
         localStorage.setItem('gta_pause_settings', JSON.stringify(settings));
     }
@@ -591,6 +901,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 sliders[0].value = settings.volume || 80;
                 sliders[1].value = settings.brightness || 50;
             }
+
+            // Flight Radar
+            const flightToggle = document.getElementById('flight-radar-toggle');
+            if (flightToggle && settings.hasOwnProperty('flightRadar')) {
+                flightToggle.checked = settings.flightRadar;
+            }
+
+            // Stores
+            const storesToggle = document.getElementById('stores-toggle');
+            if (storesToggle && settings.hasOwnProperty('showStores')) {
+                storesToggle.checked = settings.showStores;
+            }
         }
     }
 
@@ -621,6 +943,31 @@ document.addEventListener('DOMContentLoaded', () => {
                     saveSettings();
                 };
                 reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    const flightToggle = document.getElementById('flight-radar-toggle');
+    if (flightToggle) {
+        flightToggle.addEventListener('change', () => {
+            saveSettings();
+            if (!flightToggle.checked) {
+                clearFlightBlips();
+            } else {
+                fetchFlights();
+                fetchAirports();
+            }
+        });
+    }
+
+    const storesToggle = document.getElementById('stores-toggle');
+    if (storesToggle) {
+        storesToggle.addEventListener('change', () => {
+            saveSettings();
+            if (!storesToggle.checked) {
+                clearStoreBlips();
+            } else {
+                fetchStores();
             }
         });
     }

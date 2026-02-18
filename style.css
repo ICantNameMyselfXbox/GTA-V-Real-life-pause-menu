@@ -199,43 +199,53 @@ body {
 /* Flight Blips */
 .plane-blip,
 .heli-blip {
-    width: 24px;
-    height: 24px;
+    width: 32px;
+    height: 32px;
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
     filter: drop-shadow(0 0 2px black);
-    transition: transform 0.5s linear;
+    transition: opacity 0.3s ease;
+    /* Avoid transitioning transform/all as it conflicts with MapLibre's internal positioning */
     pointer-events: none;
-    opacity: 0.8;
+    opacity: 0.9;
+}
+
+.airport-blip {
+    width: 28px;
+    height: 28px;
+    background-image: url('Blips/radar_airport.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0 0 2px black);
+    pointer-events: auto;
+    cursor: help;
+}
+
+.store-blip {
+    width: 26px;
+    height: 26px;
+    background-image: url('Blips/radar_shop.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0 0 2px black);
+    pointer-events: auto;
+    cursor: help;
 }
 
 .plane-blip {
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>');
+    background-image: url('Blips/radar_player_plane.png');
 }
 
 .heli-blip {
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 14.5v.5h-2v-.5l-.83-.17c-.5-.1-1-.42-1.17-.83l1.83-.83c.17.41.5.5.83.5.33 0 .67-.17.67-.5s-.34-.5-.67-.5H10c-1.16 0-2-.84-2-2s.84-2 2-2h.83v-.5h2v.5l.84.17c.5.1 1 .42 1.17.83L13 12.83c-.17-.41-.5-.5-.83-.5-.34 0-.67.17-.67.5s.34.5.67.5H13c1.16 0 2 .84 2 2s-.84 2-2 2h-.83z"/></svg>');
+    background-image: url('Blips/radar_player_heli.gif');
+    width: 48px;
+    height: 48px;
 }
 
-@keyframes pulse-opacity {
-    0% {
-        opacity: 0.4;
-    }
-
-    50% {
-        opacity: 0.9;
-    }
-
-    100% {
-        opacity: 0.4;
-    }
-}
-
-.plane-blip,
-.heli-blip {
-    animation: pulse-opacity 2s infinite ease-in-out;
-}
+/* Flight Blips no longer flash */
 
 @keyframes flash {
     0% {
