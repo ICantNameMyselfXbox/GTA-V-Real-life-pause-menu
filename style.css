@@ -183,7 +183,7 @@ body {
 }
 
 .map-overlay-info div {
-    padding: 10px 15px;
+    padding: 6px 10px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -837,4 +837,5 @@ body {
     .key-hint {
         font-size: 0.8rem;
     }
+
 }
