@@ -191,6 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let storeMarkers = {};
     let userPos = { lat: 0, lng: 0 }; // Global tracking
     let radarServiceInitialised = false; // New safety flag
+    let worldSyncInterval = null; // Track sync interval to avoid duplicates
 
     // API Throttling
     let lastFetchTimes = {
@@ -504,6 +505,12 @@ document.addEventListener('DOMContentLoaded', () => {
         userPos.lat = lat;
         userPos.lng = lng;
 
+        // Clear all existing blips on re-init to prevent ghosting
+        for (let id in otherPlayers) {
+            if (otherPlayers[id].marker) otherPlayers[id].marker.remove();
+        }
+        otherPlayers = {};
+
         // Universal Global Lobby ID - Everyone connects here
         const hubId = 'GTA-V-UNIVERSAL-LOBBY-M4K0';
 
@@ -633,7 +640,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (peerIdEl) peerIdEl.innerText = hubId;
 
                 // MASTER WORLD SYNC: Send the state of EVERYONE to EVERYBODY every 3s
-                setInterval(() => {
+                if (worldSyncInterval) clearInterval(worldSyncInterval);
+                worldSyncInterval = setInterval(() => {
                     const worldData = {
                         type: 'WORLD_SYNC',
                         players: {}
@@ -726,15 +734,18 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateOtherPlayer(data) {
         const id = data.peerId || data.id;
 
-        // CRITICAL: Don't draw ourselves!
-        if (id === myPeerId) return;
+        // --- GHOST PROTECTION GUARDS ---
+        if (!id || id === "undefined" || id === "null") return;
+        if (id === myPeerId) return; // Don't draw ourselves
+
+        // Don't draw blips at 0,0 (common default before GPS/Net kicks in)
+        if (Math.abs(data.lat) < 0.0001 && Math.abs(data.lng) < 0.0001) return;
 
         if (otherPlayers[id]) {
-            console.log(`[PLAYER] Updating position for: ${data.name || id}`);
             otherPlayers[id].marker.setLngLat([data.lng, data.lat]);
             otherPlayers[id].lat = data.lat;
             otherPlayers[id].lng = data.lng;
-            otherPlayers[id].name = data.name;
+            otherPlayers[id].name = data.name || data.peerId || "Unknown Player";
             otherPlayers[id].lastUpdate = Date.now();
         } else {
             console.log('New player detected on map:', id);
