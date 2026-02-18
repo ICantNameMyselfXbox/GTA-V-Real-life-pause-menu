@@ -967,12 +967,33 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchWeather(lat, lng) {
         try {
             // Removed temperature_unit=fahrenheit to default to Celsius
-            const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,weather_code,is_day&daily=weather_code,temperature_2m_max&timezone=auto`);
+            const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,weather_code,is_day&daily=weather_code,temperature_2m_max&timezone=auto`);
             const data = await response.json();
 
             updateWeatherUI(data);
+            fetchAirQuality(lat, lng);
         } catch (error) {
             console.error("Weather fetch failed:", error);
+        }
+    }
+
+    async function fetchAirQuality(lat, lng) {
+        try {
+            const response = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lng}&current=us_aqi`);
+            const data = await response.json();
+            if (data.current && data.current.us_aqi) {
+                const aqi = data.current.us_aqi;
+                const aqiEl = document.querySelector('.aqi-value');
+                if (aqiEl) {
+                    aqiEl.innerText = `AQI ${aqi}`;
+                    // Optional color coding
+                    if (aqi <= 50) aqiEl.style.color = '#2ecc71'; // Good
+                    else if (aqi <= 100) aqiEl.style.color = '#f1c40f'; // Moderate
+                    else aqiEl.style.color = '#e74c3c'; // Unhealthy
+                }
+            }
+        } catch (error) {
+            console.error("AQI fetch failed:", error);
         }
     }
 
@@ -1001,6 +1022,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('.temperature').innerText = `${Math.round(current.temperature_2m)}°C`;
         document.querySelector('.condition').innerText = currentInfo.text;
         document.querySelector('.weather-icon').innerText = currentInfo.icon;
+
+        const humidityEl = document.querySelector('.humidity-value');
+        if (humidityEl && current.relative_humidity_2m) {
+            humidityEl.innerText = `${current.relative_humidity_2m}%`;
+        }
 
         // Update Forecast (Next 3 days)
         const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
