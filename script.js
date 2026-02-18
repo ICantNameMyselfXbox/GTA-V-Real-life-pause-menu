@@ -167,8 +167,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let otherPlayers = {}; // { peerId: { marker, lat, lng } }
-    let connections = []; // Track connections if we are the hub
     let currentPeer = null;
+    let connections = []; // Track connections if we are the hub
+    let flightMarkers = {};
+    let flightRadarStarted = false;
     let userPos = { lat: 0, lng: 0 }; // Global tracking
 
     function initMultiplayer(lat, lng) {
@@ -182,8 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const peerIdEl = document.getElementById('debug-peer-id');
         if (statusEl) statusEl.innerText = "FINDING SESSION...";
 
-        // PeerJS Config with STUN and TURN servers for Global NAT traversal
-        // Note: Real TURN servers usually require credentials. These are public placeholders.
+        // PeerJS Config with expanded STUN servers for robust Global NAT traversal
         const peerConfig = {
             debug: 1,
             config: {
@@ -192,7 +193,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     { urls: 'stun:stun1.l.google.com:19302' },
                     { urls: 'stun:stun2.l.google.com:19302' },
                     { urls: 'stun:stun3.l.google.com:19302' },
-                    { urls: 'stun:stun4.l.google.com:19302' }
+                    { urls: 'stun:stun4.l.google.com:19302' },
+                    { urls: 'stun:global.stun.twilio.com:3478' }
                 ]
             }
         };
@@ -210,6 +212,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (peerIdEl) peerIdEl.innerText = myId;
             if (statusEl) statusEl.innerText = "JOINING GLOBAL LOBBY...";
             attemptConnect(hubId, myId, peer);
+
+            // Start flight radar safely
+            if (userPos.lat !== 0 && !flightRadarStarted) {
+                startFlightRadar();
+                flightRadarStarted = true;
+            }
         });
 
         function attemptConnect(targetId, myId, peerRef) {
@@ -267,6 +275,72 @@ document.addEventListener('DOMContentLoaded', () => {
                 peerRef.destroy();
                 becomeHub();
             });
+        }
+
+        // --- FLIGHT RADAR LOGIC ---
+        let flightMarkers = {};
+
+        function startFlightRadar() {
+            fetchFlights();
+            setInterval(fetchFlights, 15000); // 15s refresh for OpenSky API
+        }
+
+        async function fetchFlights() {
+            try {
+                // Fetch aircraft within ~50km box
+                const offset = 0.5;
+                const url = `https://opensky-network.org/api/states/all?lamin=${userPos.lat - offset}&lomin=${userPos.lng - offset}&lamax=${userPos.lat + offset}&lomax=${userPos.lng + offset}`;
+
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data && data.states) {
+                    updateFlightBlips(data.states);
+                }
+            } catch (error) {
+                console.warn("Flight Radar failed (too many requests?):", error);
+            }
+        }
+
+        function updateFlightBlips(states) {
+            const seenIds = new Set();
+
+            states.forEach(state => {
+                const id = state[0]; // ICAO24
+                const lng = state[5];
+                const lat = state[6];
+                const track = state[10] || 0; // True Track
+                const velocity = state[9] || 0;
+
+                if (lat && lng) {
+                    seenIds.add(id);
+                    // Guess if it's a helicopter or plane (Heli: Slow and low)
+                    const isHeli = velocity < 60 && state[7] < 1000;
+
+                    if (flightMarkers[id]) {
+                        flightMarkers[id].marker.setLngLat([lng, lat]);
+                        flightMarkers[id].el.style.transform = `rotate(${track}deg)`;
+                    } else {
+                        const el = document.createElement('div');
+                        el.className = isHeli ? 'heli-blip' : 'plane-blip';
+                        el.style.transform = `rotate(${track}deg)`;
+
+                        const marker = new maplibregl.Marker({ element: el })
+                            .setLngLat([lng, lat])
+                            .addTo(map);
+
+                        flightMarkers[id] = { marker, el };
+                    }
+                }
+            });
+
+            // Cleanup flights that left the area
+            for (let id in flightMarkers) {
+                if (!seenIds.has(id)) {
+                    flightMarkers[id].marker.remove();
+                    delete flightMarkers[id];
+                }
+            }
         }
 
         function becomeHub() {
