@@ -209,8 +209,6 @@ body {
     /* Avoid transitioning transform/all as it conflicts with MapLibre's internal positioning */
     pointer-events: none;
     opacity: 0.9;
-    transform-origin: center center;
-    will-change: transform;
 }
 
 .airport-blip {
@@ -223,8 +221,6 @@ body {
     filter: drop-shadow(0 0 2px black);
     pointer-events: auto;
     cursor: help;
-    transform-origin: center center;
-    will-change: transform;
 }
 
 .store-blip {
@@ -234,11 +230,8 @@ body {
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
-    filter: drop-shadow(0 0 2px black);
     pointer-events: auto;
     cursor: help;
-    transform-origin: center center;
-    will-change: transform;
 }
 
 .plane-blip {
@@ -272,19 +265,17 @@ body {
     width: 32px;
     height: 32px;
     position: relative;
-    display: flex;
-    justify-content: center;
-    align-items: center;
     cursor: pointer;
     pointer-events: auto;
-    transform-origin: center center;
-    will-change: transform;
 }
 
 /* The actual visual icon */
 .blip-icon {
     width: 32px;
     height: 32px;
+    position: absolute;
+    top: 0;
+    left: 0;
     background-size: contain;
     background-position: center;
     background-repeat: no-repeat;

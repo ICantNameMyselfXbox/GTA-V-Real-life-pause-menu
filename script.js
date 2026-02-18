@@ -137,8 +137,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 playerMarker = new maplibregl.Marker({
                     element: playerMarkerEl,
                     anchor: 'center', // CRITICAL for zoom stability
-                    rotationAlignment: 'map',
-                    pitchAlignment: 'map'
+                    rotationAlignment: 'viewport',
+                    pitchAlignment: 'viewport'
                 })
                     .setLngLat([lng, lat])
                     .addTo(map);
@@ -445,7 +445,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         element: el,
                         rotation: track,
                         anchor: 'center',
-                        rotationAlignment: 'map',
+                        rotationAlignment: 'viewport',
                         pitchAlignment: 'viewport'
                     })
                         .setLngLat([lng, lat])
@@ -546,7 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const marker = new maplibregl.Marker({
                         element: markerEl,
                         anchor: 'center',
-                        rotationAlignment: 'map',
+                        rotationAlignment: 'viewport',
                         pitchAlignment: 'viewport'
                     })
                         .setLngLat([lon, lat])
@@ -892,7 +892,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const marker = new maplibregl.Marker({
                 element: el,
                 anchor: 'center', // CRITICAL for zoom stability
-                rotationAlignment: 'map',
+                rotationAlignment: 'viewport',
                 pitchAlignment: 'viewport'
             })
                 .setLngLat([data.lng, data.lat])
