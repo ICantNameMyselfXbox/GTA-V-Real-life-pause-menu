@@ -144,8 +144,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Check if map is ready, if not wait for load
                 if (map.isStyleLoaded()) {
                     startFlightRadar();
+                    initStaticMapLayers();
                 } else {
-                    map.once('load', () => startFlightRadar());
+                    map.once('load', () => {
+                        startFlightRadar();
+                        initStaticMapLayers();
+                    });
                     // Mark as started now so we don't attach multiple listeners
                     flightRadarStarted = true;
                 }
@@ -184,7 +188,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let connections = []; // Track connections if we are the hub
     let flightMarkers = {};
     let flightRadarStarted = false;
-    let airportMarkers = {};
     let storeMarkers = {};
     let userPos = { lat: 0, lng: 0 }; // Global tracking
     let radarServiceInitialised = false; // New safety flag
@@ -192,7 +195,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // API Throttling
     let lastFetchTimes = {
         flights: 0,
-        airports: 0,
         stores: 0
     };
 
@@ -219,14 +221,61 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Throttled refresh on move
                 const now = Date.now();
                 if (now - lastFetchTimes.flights > 5000) fetchFlights();
-                if (now - lastFetchTimes.airports > 10000) fetchAirports();
                 if (now - lastFetchTimes.stores > 5000) fetchStores();
             }, 1000);
         });
 
         // Initial fetch
-        fetchAirports();
         fetchStores();
+    }
+
+    function initStaticMapLayers() {
+        if (!map) return;
+
+        // Add Airport Icons to the map itself as a layer
+        map.loadImage('Blips/radar_airport.png', (error, image) => {
+            if (error) {
+                console.error("Failed to load airport icon:", error);
+                return;
+            }
+            if (!map.hasImage('airport-icon')) map.addImage('airport-icon', image);
+
+            map.addSource('airports', {
+                type: 'geojson',
+                data: 'https://raw.githubusercontent.com/grafana/grafana/main/public/gazetteer/airports.geojson'
+            });
+
+            map.addLayer({
+                id: 'airports-layer',
+                type: 'symbol',
+                source: 'airports',
+                layout: {
+                    'icon-image': 'airport-icon',
+                    'icon-size': 0.8,
+                    'icon-allow-overlap': true,
+                    'text-field': ['get', 'name'],
+                    'text-font': ['Open Sans Semibold', 'Arial Unicode MS Bold'],
+                    'text-offset': [0, 1.25],
+                    'text-anchor': 'top',
+                    'text-size': 12,
+                    'visibility': 'visible'
+                },
+                paint: {
+                    'text-color': '#ffffff',
+                    'text-halo-color': '#000000',
+                    'text-halo-width': 1
+                }
+            });
+
+            // Toggle logic based on settings
+            const toggle = document.getElementById('flight-radar-toggle');
+            if (toggle) {
+                map.setLayoutProperty('airports-layer', 'visibility', toggle.checked ? 'visible' : 'none');
+                toggle.addEventListener('change', (e) => {
+                    map.setLayoutProperty('airports-layer', 'visibility', e.target.checked ? 'visible' : 'none');
+                });
+            }
+        });
     }
 
     function predictFlights() {
@@ -360,94 +409,9 @@ document.addEventListener('DOMContentLoaded', () => {
             flightMarkers[id].marker.remove();
         }
         flightMarkers = {};
-        clearAirportBlips();
     }
 
-    async function fetchAirports() {
-        const toggle = document.getElementById('flight-radar-toggle');
-        if (toggle && !toggle.checked) {
-            clearAirportBlips();
-            return;
-        }
 
-        if (!map || !map.getStyle() || map.getZoom() < 4) {
-            clearAirportBlips();
-            return;
-        }
-
-        try {
-            const bounds = map.getBounds();
-            const query = `
-                [out:json][timeout:25];
-                (
-                  node["aeroway"="aerodrome"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
-                  way["aeroway"="aerodrome"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
-                  relation["aeroway"="aerodrome"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
-                );
-                out center;`;
-
-
-            const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-
-            lastFetchTimes.airports = Date.now();
-            const response = await fetch(url);
-
-            if (response.status === 429) {
-                console.warn("[AIRPORTS] Overpass Rate Limited. Increasing cooldown.");
-                lastFetchTimes.airports += 60000; // Block for 1 min
-                return;
-            }
-            const data = await response.json();
-
-            if (data && data.elements) {
-                console.log(`[AIRPORTS] Found ${data.elements.length} airports in view.`);
-                updateAirportBlips(data.elements);
-            }
-        } catch (error) {
-            console.warn("[AIRPORTS] Overpass API failed:", error);
-        }
-    }
-
-    function updateAirportBlips(elements) {
-        const seenIds = new Set();
-
-        elements.forEach(el => {
-            const id = el.id;
-            const lat = el.lat || (el.center && el.center.lat);
-            const lon = el.lon || (el.center && el.center.lon);
-            const name = (el.tags && el.tags.name) || "Airport";
-
-            if (lat && lon) {
-                seenIds.add(id);
-                if (!airportMarkers[id]) {
-                    const markerEl = document.createElement('div');
-                    markerEl.className = 'airport-blip';
-                    markerEl.title = name;
-
-                    const marker = new maplibregl.Marker({ element: markerEl })
-                        .setLngLat([lon, lat])
-                        .addTo(map);
-
-                    airportMarkers[id] = { marker, name };
-                }
-            }
-        });
-
-        // Cleanup
-        for (let id in airportMarkers) {
-            if (!seenIds.has(id)) {
-                airportMarkers[id].marker.remove();
-                delete airportMarkers[id];
-            }
-        }
-    }
-
-    function clearAirportBlips() {
-        for (let id in airportMarkers) {
-            airportMarkers[id].marker.remove();
-        }
-        airportMarkers = {};
-    }
 
     async function fetchStores() {
         const toggle = document.getElementById('stores-toggle');
