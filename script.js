@@ -248,8 +248,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let myPeerId = null; // Store local ID to avoid self-blips
     let connections = []; // Track connections if we are the hub
     let flightMarkers = {};
-
-    let storeMarkers = {};
     let userPos = { lat: 0, lng: 0 }; // Global tracking
     let radarServiceInitialised = false; // New safety flag
     let worldSyncInterval = null; // Track sync interval to avoid duplicates
@@ -267,8 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // API Throttling
     let lastFetchTimes = {
-        flights: 0,
-        stores: 0
+        flights: 0
     };
 
     // --- STATS TRACKING ---
@@ -328,20 +325,13 @@ document.addEventListener('DOMContentLoaded', () => {
         // Start Predictive Glide Loop (every 100ms)
         setInterval(predictFlights, 250); // Reduced from 100ms to ease CPU load
 
-        // Map move: re-filter global aircraft cache to new viewport, refresh stores if stale
+        // Map move: re-filter global aircraft cache to new viewport
         let moveTimeout;
         map.on('moveend', () => {
             // Instantly re-render aircraft for new viewport from cached global data
             applyViewportFilter();
-            clearTimeout(moveTimeout);
-            moveTimeout = setTimeout(() => {
-                const now = Date.now();
-                if (now - lastFetchTimes.stores > 30000) fetchStores();
-            }, 1000);
         });
 
-        // Initial fetch
-        fetchStores();
     }
 
     function initStaticMapLayers() {
@@ -580,100 +570,6 @@ document.addEventListener('DOMContentLoaded', () => {
             flightMarkers[id].marker.remove();
         }
         flightMarkers = {};
-    }
-
-
-
-    async function fetchStores() {
-        const toggle = document.getElementById('stores-toggle');
-        if (toggle && !toggle.innerText.includes('On')) {
-            clearStoreBlips();
-            return;
-        }
-
-        if (!map || !map.getStyle() || map.getZoom() < 12) {
-            clearStoreBlips();
-            return;
-        }
-
-        try {
-            const bounds = map.getBounds();
-            const query = `
-                [out:json][timeout:25];
-                (
-                  node["shop"~"convenience|supermarket|liquor|clothes"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
-                  way["shop"~"convenience|supermarket|liquor|clothes"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
-                  node["amenity"="fuel"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
-                  way["amenity"="fuel"](${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()});
-                );
-                out center;`;
-
-
-            const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
-
-            lastFetchTimes.stores = Date.now();
-            const response = await fetch(url);
-
-            if (response.status === 429) {
-                console.warn("[STORES] Store API Rate Limited. Increasing cooldown.");
-                lastFetchTimes.stores += 60000; // Block for 1 min
-                return;
-            }
-            const data = await response.json();
-
-            if (data && data.elements) {
-                console.log(`[STORES] Found ${data.elements.length} stores in view.`);
-                updateStoreBlips(data.elements);
-            }
-        } catch (error) {
-            console.warn("[STORES] Overpass API failed:", error);
-        }
-    }
-
-    function updateStoreBlips(elements) {
-        const seenIds = new Set();
-
-        elements.forEach(el => {
-            const id = el.id;
-            const lat = el.lat || (el.center && el.center.lat);
-            const lon = el.lon || (el.center && el.center.lon);
-            const name = (el.tags && el.tags.name) || "Store";
-
-            if (lat && lon) {
-                seenIds.add(id);
-                if (!storeMarkers[id]) {
-                    const markerEl = document.createElement('div');
-                    markerEl.className = 'store-blip';
-                    markerEl.title = name;
-
-                    const marker = new maplibregl.Marker({
-                        element: markerEl,
-                        anchor: 'center',
-                        rotationAlignment: 'viewport',
-                        pitchAlignment: 'viewport'
-                    })
-                        .setLngLat([lon, lat])
-                        .addTo(map);
-
-                    storeMarkers[id] = { marker, name };
-                }
-            }
-        });
-
-        // Cleanup
-        for (let id in storeMarkers) {
-            if (!seenIds.has(id)) {
-                storeMarkers[id].marker.remove();
-                delete storeMarkers[id];
-            }
-        }
-    }
-
-    function clearStoreBlips() {
-        for (let id in storeMarkers) {
-            storeMarkers[id].marker.remove();
-        }
-        storeMarkers = {};
     }
 
     function initMultiplayer(lat, lng) {
