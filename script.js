@@ -816,10 +816,20 @@ document.addEventListener('DOMContentLoaded', () => {
             otherPlayers[id].name = data.name || "Unknown Player";
             otherPlayers[id].sessionId = data.sessionId;
             otherPlayers[id].lastUpdate = Date.now();
+
+            // Update Name Tag text
+            const nameTag = otherPlayers[id].marker.getElement().querySelector('.blip-name-tag');
+            if (nameTag) nameTag.innerText = otherPlayers[id].name;
         } else {
             console.log('New player detected (Session ID):', id);
             const el = document.createElement('div');
             el.className = 'other-blip';
+
+            // Create Name Tag
+            const nameTag = document.createElement('span');
+            nameTag.className = 'blip-name-tag';
+            nameTag.innerText = data.name || "Unknown Player";
+            el.appendChild(nameTag);
 
             const marker = new maplibregl.Marker({ element: el })
                 .setLngLat([data.lng, data.lat])

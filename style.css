@@ -276,6 +276,62 @@ body {
     background-size: cover;
     width: 30px;
     height: 30px;
+    position: relative;
+    /* For name tag alignment */
+    cursor: pointer;
+}
+
+/* GTA Online Style Name Tags */
+.blip-name-tag {
+    position: absolute;
+    left: 110%;
+    /* To the right of the blip */
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 4px 10px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    white-space: nowrap;
+    border-radius: 2px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    border-left: 3px solid var(--accent-color);
+    z-index: 1000;
+}
+
+.other-blip:hover .blip-name-tag,
+.other-blip:active .blip-name-tag {
+    opacity: 1;
+}
+
+.player-blip {
+    background-image: url('Blips/Player.png');
+    background-size: cover;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    position: relative;
+    cursor: pointer;
+}
+
+.player-blip:hover::after {
+    content: "YOU";
+    position: absolute;
+    left: 110%;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: #fff;
+    padding: 4px 10px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    border-left: 3px solid #fff;
+    white-space: nowrap;
 }
 
 .location-name {
