@@ -192,6 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let userPos = { lat: 0, lng: 0 }; // Global tracking
     let radarServiceInitialised = false; // New safety flag
     let worldSyncInterval = null; // Track sync interval to avoid duplicates
+    let isMultiplayerTransitioning = false; // Guard against refresh loops
 
     // API Throttling
     let lastFetchTimes = {
@@ -502,6 +503,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function initMultiplayer(lat, lng) {
+        if (isMultiplayerTransitioning) return;
+        isMultiplayerTransitioning = true;
+
         userPos.lat = lat;
         userPos.lng = lng;
 
@@ -542,6 +546,7 @@ document.addEventListener('DOMContentLoaded', () => {
         currentPeer = peer;
 
         peer.on('open', (myId) => {
+            isMultiplayerTransitioning = false;
             console.log('My Peer ID:', myId);
             myPeerId = myId; // Save globally
             if (peerIdEl) peerIdEl.innerText = myId;
@@ -550,13 +555,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         peer.on('error', (err) => {
+            isMultiplayerTransitioning = false;
             console.error('Peer Primary Error:', err.type, err);
             if (err.type === 'peer-unavailable') {
                 // Lobby peer is likely dead or transition in progress
                 becomeHub();
             } else if (err.type === 'network' || err.type === 'server-error') {
                 if (statusEl) statusEl.innerText = "RECONNECTING...";
-                setTimeout(() => initMultiplayer(userPos.lat, userPos.lng), 3000);
+                setTimeout(() => initMultiplayer(userPos.lat, userPos.lng), 5000);
             }
         });
 
@@ -622,12 +628,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- END OF MOVED LOGIC ---
 
         function becomeHub() {
-            if (statusEl) statusEl.innerText = "LOBBY ACTIVE (RELAY)";
+            if (isMultiplayerTransitioning) return;
+            isMultiplayerTransitioning = true;
+
+            if (statusEl) statusEl.innerText = "CLAIMING RELAY...";
 
             const hubPeer = new Peer(hubId, peerConfig);
             currentPeer = hubPeer;
 
             hubPeer.on('open', () => {
+                isMultiplayerTransitioning = false;
+                if (statusEl) statusEl.innerText = "LOBBY ACTIVE (RELAY)";
                 console.log('+++ GLOBAL LOBBY RELAY ACTIVE +++');
                 myPeerId = hubId; // CRITICAL
 
@@ -690,10 +701,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             hubPeer.on('error', (err) => {
+                isMultiplayerTransitioning = false;
                 if (err.type === 'unavailable-id') {
-                    console.log('Hub ID taken. Reverting to client mode...');
+                    console.log('Hub ID taken. Backing off before reconnecting...');
                     hubPeer.destroy();
-                    setTimeout(() => initMultiplayer(userPos.lat, userPos.lng), 1000);
+                    if (statusEl) statusEl.innerText = "LOBBY BUSY - RETRYING...";
+                    setTimeout(() => initMultiplayer(userPos.lat, userPos.lng), 5000);
                 } else {
                     console.error("Hub Error:", err);
                     if (statusEl) statusEl.innerText = "CONNECTION ERROR";
