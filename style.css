@@ -1036,4 +1036,93 @@ body {
     .key-hint {
         font-size: 0.8rem;
     }
+
+}
+
+/* Flight Radar Blips */
+.flight-blip-container {
+    width: 0;
+    height: 0;
+    /* MapLibre handles positioning of this container via transform: translate() */
+    /* We just ensure it doesn't have dimensions to mess up centering */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 500;
+}
+
+.plane-blip,
+.heli-blip {
+    width: 32px;
+    height: 32px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    /* Important: Center the rotation anchor */
+    transform-origin: center center;
+    /* This element will be rotated by JS: transform: rotate(Xdeg) */
+    /* Absolute positioning to ensure it centers on the container (0,0) */
+    position: absolute;
+    top: -16px;
+    left: -16px;
+}
+
+/* Default Plane Icon */
+.plane-blip {
+    background-image: url('Blips/radar_player_plane.png');
+}
+
+/* Default Heli Icon */
+.heli-blip {
+    background-image: url('Blips/radar_player_heli.gif');
+}
+
+/* Variants (hue rotation for variety) */
+.plane-0 {
+    filter: hue-rotate(0deg);
+}
+
+.plane-1 {
+    filter: hue-rotate(30deg);
+}
+
+.plane-2 {
+    filter: hue-rotate(60deg);
+}
+
+.plane-3 {
+    filter: hue-rotate(90deg);
+}
+
+.plane-4 {
+    filter: hue-rotate(120deg);
+}
+
+.plane-5 {
+    filter: hue-rotate(150deg);
+}
+
+.plane-6 {
+    filter: hue-rotate(180deg);
+}
+
+.plane-7 {
+    filter: hue-rotate(210deg);
+}
+
+.plane-8 {
+    filter: hue-rotate(240deg);
+}
+
+.plane-9 {
+    filter: hue-rotate(270deg);
+}
+
+.plane-10 {
+    filter: hue-rotate(300deg);
+}
+
+.plane-11 {
+    filter: hue-rotate(330deg);
 }

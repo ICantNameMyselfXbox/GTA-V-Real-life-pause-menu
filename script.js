@@ -318,34 +318,31 @@ document.addEventListener('DOMContentLoaded', () => {
         if (radarServiceInitialised) return;
         radarServiceInitialised = true;
 
-
-        console.log("+++ Flight Radar Service starting (60s cooldown) +++");
+        console.log("+++ Flight Radar Service starting (10s cooldown) +++");
         fetchFlights(); // Initial fetch
 
-        // Start Predictive Glide Loop (every 100ms)
-        setInterval(predictFlights, 250); // Reduced from 100ms to ease CPU load
+        // Physics Engine Loop (every 50ms for smooth 20fps updates)
+        setInterval(() => {
+            simulateAircraftMovement();
+            applyViewportFilter(); // Re-render markers at new positions
+        }, 50);
 
-        // Map move: re-fetch if center moved significantly, otherwise just re-filter cache
+        // Map move: re-fetch if center moved significantly
         let lastFetchCenter = null;
         map.on('moveend', () => {
             const center = map.getCenter();
-            if (!lastFetchCenter) {
-                lastFetchCenter = center;
-            }
-            // Haversine-lite: degrees diff as proxy for distance (1° lat ≈ 111km)
+            if (!lastFetchCenter) lastFetchCenter = center;
+
+            // Haversine-lite
             const dLat = Math.abs(center.lat - lastFetchCenter.lat);
             const dLng = Math.abs(center.lng - lastFetchCenter.lng) * Math.cos(center.lat * Math.PI / 180);
             const degreeDist = Math.sqrt(dLat * dLat + dLng * dLng);
+
             if (degreeDist > 1.5) {
-                // Panned ~165km+ from last fetch — get fresh data for new area
                 lastFetchCenter = center;
                 fetchFlights();
-            } else {
-                // Just re-filter the current cache to new viewport
-                applyViewportFilter();
             }
         });
-
     }
 
     function initStaticMapLayers() {
@@ -377,8 +374,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 paint: {}
             });
 
-
-
             // Initial scale application if settings loaded
             const savedSettings = localStorage.getItem('gta_pause_settings');
             if (savedSettings) {
@@ -393,7 +388,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (toggle) {
                 map.setLayoutProperty('airports-layer', 'visibility', toggle.innerText.includes('On') ? 'visible' : 'none');
                 toggle.addEventListener('click', () => {
-                    // Read state AFTER click (text already updated by the click handler)
                     setTimeout(() => {
                         map.setLayoutProperty('airports-layer', 'visibility', toggle.innerText.includes('On') ? 'visible' : 'none');
                     }, 0);
@@ -426,30 +420,27 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function predictFlights() {
-        const deltaT = 0.25; // BUG 2 FIX: interval is 250ms, so deltaT must be 0.25s
+    // Physics Engine: Update ALL aircraft positions (global state), not just markers
+    function simulateAircraftMovement() {
+        if (!allAircraftData || allAircraftData.length === 0) return;
+
+        const deltaT = 0.05; // 50ms = 0.05s
         const degM = 111111; // Approx meters per degree
 
-        for (let id in flightMarkers) {
-            try {
-                const f = flightMarkers[id];
-                if (!f || !f.marker) continue;
-                if (f.velocity && f.velocity > 0) {
-                    // Approximate dead reckoning
-                    const rad = (f.track - 90) * (Math.PI / 180); // Adjusting for polar coords
-                    const dx = Math.cos(rad) * f.velocity * deltaT;
-                    const dy = -Math.sin(rad) * f.velocity * deltaT; // Lat decreases as we go "South"
+        allAircraftData.forEach(ac => {
+            if (ac.gs && ac.gs > 0 && ac.track !== undefined) {
+                // ac.gs is in Knots. 1 Knot = 0.514444 m/s
+                const speedMs = ac.gs * 0.514444;
 
-                    f.lat += dy / degM;
-                    f.lng += dx / (degM * Math.cos(f.lat * Math.PI / 180));
+                const rad = (ac.track - 90) * (Math.PI / 180);
+                const dx = Math.cos(rad) * speedMs * deltaT;
+                const dy = -Math.sin(rad) * speedMs * deltaT;
 
-                    f.marker.setLngLat([f.lng, f.lat]);
-                }
-            } catch (e) {
-                // Marker was removed mid-loop, clean up safely
-                delete flightMarkers[id];
+                ac.lat += dy / degM;
+                // adjustments for longitude at latitude
+                ac.lon += dx / (degM * Math.cos(ac.lat * Math.PI / 180));
             }
-        }
+        });
     }
 
     async function fetchFlights() {
@@ -489,7 +480,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data && Array.isArray(data.ac)) {
                 console.log(`[RADAR] ✈ Found ${data.ac.length} aircraft near map center.`);
-                flightCooldown = 60000;
+                flightCooldown = 10000; // Fetch every 10s (was 60s) for "real-time" feel
                 allAircraftData = data.ac; // cache for viewport filtering & pan re-use
                 applyViewportFilter();
             } else {
@@ -504,7 +495,6 @@ document.addEventListener('DOMContentLoaded', () => {
         scheduleNextFlightFetch(flightCooldown);
     }
 
-    // Filter cached aircraft to current map viewport bounds
     function applyViewportFilter() {
         if (!allAircraftData || !map) return;
         const bounds = map.getBounds();
@@ -519,7 +509,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ac.lon >= w && ac.lon <= e
         );
 
-        console.log(`[RADAR] Viewport: ${visible.length} visible aircraft.`);
+        // console.log(`[RADAR] Viewport: ${visible.length} visible aircraft.`);
+        // Reduced logging to avoid spam in 50ms loop
         updateFlightBlips(visible);
     }
 
@@ -547,12 +538,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (flightMarkers[id]) {
                 flightMarkers[id].marker.setLngLat([lng, lat]);
+                // Rotate the INNER element, not the container
                 flightMarkers[id].el.style.transform = `rotate(${track}deg)`;
                 flightMarkers[id].lat = lat;
                 flightMarkers[id].lng = lng;
                 flightMarkers[id].velocity = gs;
                 flightMarkers[id].track = track;
             } else {
+                // Container for MapLibre positioning
+                const container = document.createElement('div');
+                container.className = 'flight-blip-container';
+
+                // Inner element for rotation & icon
                 const el = document.createElement('div');
                 el.className = isHeli ? 'heli-blip' : 'plane-blip';
                 el.style.transform = `rotate(${track}deg)`;
@@ -562,8 +559,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     el.classList.add(`plane-${rand}`);
                 }
 
+                container.appendChild(el);
+
                 const marker = new maplibregl.Marker({
-                    element: el,
+                    element: container,
                     anchor: 'center',
                     rotationAlignment: 'viewport',
                     pitchAlignment: 'viewport'
