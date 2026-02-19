@@ -1122,3 +1122,7 @@ body {
 .heli-type {
     background-image: url('Blips/radar_player_heli.gif');
 }
+
+.oppressor-type {
+    background-image: url('Blips/radar_oppressor.png');
+}

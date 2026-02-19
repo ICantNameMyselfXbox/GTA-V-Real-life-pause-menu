@@ -323,6 +323,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Physics Engine Loop (every 50ms for smooth 20fps updates)
         setInterval(() => {
+            const toggle = document.getElementById('flight-radar-toggle');
+            if (toggle && !toggle.innerText.includes('On')) {
+                // If disabled, ensure cleared
+                if (allAircraftData && allAircraftData.length > 0) {
+                    allAircraftData = [];
+                    clearFlightBlips();
+                }
+                return;
+            }
             simulateAircraftMovement();
             applyViewportFilter(); // Re-render markers at new positions
         }, 50);
@@ -534,12 +543,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const isHeli = category === 'A7'
                 || typecode.startsWith('H')
-                || (gs < 60 && (alt === 'ground' || (typeof alt === 'number' && alt < 1500)));
+                || (typeof alt === 'number' && alt < 1500 && gs < 60);
+
+            // Fallback for unidentified aircraft (no category/type data)
+            const isUnknown = !isHeli && !category && !typecode;
 
             if (flightMarkers[id]) {
                 flightMarkers[id].marker.setLngLat([lng, lat]);
                 // Rotate the INNER element, not the container
-                flightMarkers[id].el.style.transform = `rotate(${track}deg)`;
+                // Oppressor (unknown) stays upright (0deg)
+                const rotation = isUnknown ? 0 : track;
+                flightMarkers[id].el.style.transform = `rotate(${rotation}deg)`;
                 flightMarkers[id].lat = lat;
                 flightMarkers[id].lng = lng;
                 flightMarkers[id].velocity = gs;
@@ -554,11 +568,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Use new specific type classes to avoid double-background issues
                 if (isHeli) {
                     el.className = 'flight-blip-base heli-type';
+                } else if (isUnknown) {
+                    el.className = 'flight-blip-base oppressor-type';
                 } else {
                     const rand = Math.floor(Math.random() * 12);
                     el.className = `flight-blip-base plane-type-${rand}`;
                 }
-                el.style.transform = `rotate(${track}deg)`;
+
+                const rotation = isUnknown ? 0 : track;
+                el.style.transform = `rotate(${rotation}deg)`;
 
                 container.appendChild(el);
 
@@ -1284,6 +1302,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const overlayEl = document.getElementById('map-overlay-info');
             if (overlayEl) overlayEl.classList.toggle('hidden', isOn);
             saveSettings();
+        });
+    }
+
+    // Flight Radar toggle
+    const flightRadarToggle = document.getElementById('flight-radar-toggle');
+    if (flightRadarToggle) {
+        flightRadarToggle.addEventListener('click', () => {
+            const isOn = flightRadarToggle.innerText.includes('On');
+            flightRadarToggle.innerText = isOn ? '< Off >' : '< On >';
+            saveSettings();
+
+            if (isOn) {
+                // Turned OFF
+                allAircraftData = [];
+                clearFlightBlips();
+            } else {
+                // Turned ON
+                fetchFlights();
+            }
         });
     }
 
