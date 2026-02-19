@@ -251,9 +251,107 @@ document.addEventListener('DOMContentLoaded', () => {
     let userPos = { lat: 0, lng: 0 }; // Global tracking
     let radarServiceInitialised = false; // New safety flag
     let worldSyncInterval = null; // Track sync interval to avoid duplicates
-    let isMultiplayerTransitioning = false; // Guard against refresh loops
-    let heartbeatInterval = null; // BUG 5 FIX: track heartbeat so it can be cleared on reconnect
-    let volSlider = null; // BUG 1 FIX: hoist volSlider to outer scope so saveSettings() can access it
+
+
+    // --- Settings Logic ---
+    const usernameInput = document.getElementById('username-input');
+    const pfpInput = document.getElementById('pfp-input');
+    const colorInput = document.getElementById('color-input');
+    const sliders = document.querySelectorAll('.gta-slider');
+
+    function saveSettings() {
+        const flightToggle = document.getElementById('flight-radar-toggle-btn');
+
+        const blipSlider = document.getElementById('blip-scale-slider');
+        const legendToggle = document.getElementById('legend-toggle');
+        const overlayToggle = document.getElementById('overlay-toggle');
+
+        const settings = {
+            username: usernameInput.value,
+            accentColor: colorInput.value,
+            avatar: document.querySelector('.avatar').src,
+            volume: volSlider ? volSlider.value : 80,
+            flightRadar: flightToggle ? flightToggle.innerText.includes('On') : true,
+
+            blipScale: blipSlider ? blipSlider.value : 1.0,
+            showLegend: legendToggle ? legendToggle.innerText.includes('On') : true,
+            showOverlay: overlayToggle ? overlayToggle.innerText.includes('On') : true
+        };
+        localStorage.setItem('gta_pause_settings', JSON.stringify(settings));
+    }
+
+    function loadSettings() {
+        const saved = localStorage.getItem('gta_pause_settings');
+        if (saved) {
+            let settings;
+            try {
+                settings = JSON.parse(saved);
+            } catch (e) {
+                console.error("Failed to parse settings:", e);
+                localStorage.removeItem('gta_pause_settings');
+                return;
+            }
+
+            // Name
+            if (usernameInput) {
+                usernameInput.value = settings.username || 'PlayerOne';
+                document.querySelector('.username').innerText = usernameInput.value;
+            }
+
+            // Color
+            if (colorInput) {
+                colorInput.value = settings.accentColor || '#3498db';
+                document.documentElement.style.setProperty('--accent-color', colorInput.value);
+            }
+
+            // Avatar
+            if (settings.avatar) {
+                document.querySelector('.avatar').src = settings.avatar;
+            }
+
+            // Sliders
+            volSlider = document.getElementById('volume-slider');
+            const blipSlider = document.getElementById('blip-scale-slider');
+
+            if (volSlider) {
+                volSlider.value = settings.volume || 80;
+                updateSliderVisuals(volSlider);
+            }
+
+            if (blipSlider) {
+                blipSlider.value = settings.blipScale || 1.0;
+                // Apply scale immediately
+                document.documentElement.style.setProperty('--blip-scale', blipSlider.value);
+                updateSliderVisuals(blipSlider);
+            }
+
+            // Flight Radar
+            // Flight Radar
+            const flightToggle = document.getElementById('flight-radar-toggle-btn');
+            if (flightToggle && settings.hasOwnProperty('flightRadar')) {
+                flightToggle.innerText = settings.flightRadar ? '< On >' : '< Off >';
+                if (!settings.flightRadar) clearFlightBlips();
+            }
+
+
+
+            // Legend
+            const legendToggle = document.getElementById('legend-toggle');
+            if (legendToggle && settings.hasOwnProperty('showLegend')) {
+                legendToggle.innerText = settings.showLegend ? '< On >' : '< Off >';
+                const legendEl = document.getElementById('player-legend');
+                if (legendEl) legendEl.classList.toggle('hidden', !settings.showLegend);
+            }
+
+            // Map Overlay
+            const overlayToggle = document.getElementById('overlay-toggle');
+            if (overlayToggle && settings.hasOwnProperty('showOverlay')) {
+                overlayToggle.innerText = settings.showOverlay ? '< On >' : '< Off >';
+                const overlayEl = document.getElementById('map-overlay-info');
+                if (overlayEl) overlayEl.classList.toggle('hidden', !settings.showOverlay);
+            }
+        }
+    }
 
     // --- SESSION PERSISTENCE (Fixes Ghost Blips) ---
     let mySessionId = sessionStorage.getItem('gta_session_id');
@@ -393,15 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Toggle logic based on settings
-            const toggle = document.getElementById('flight-radar-toggle');
-            if (toggle) {
-                map.setLayoutProperty('airports-layer', 'visibility', toggle.innerText.includes('On') ? 'visible' : 'none');
-                toggle.addEventListener('click', () => {
-                    setTimeout(() => {
-                        map.setLayoutProperty('airports-layer', 'visibility', toggle.innerText.includes('On') ? 'visible' : 'none');
-                    }, 0);
-                });
-            }
+
         });
     }
 
@@ -453,7 +543,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function fetchFlights() {
-        const toggle = document.getElementById('flight-radar-toggle');
+        const toggle = document.getElementById('flight-radar-toggle-btn');
         if (toggle && !toggle.innerText.includes('On')) {
             clearFlightBlips();
             scheduleNextFlightFetch(flightCooldown);
@@ -548,12 +638,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // Fallback for unidentified aircraft (no category/type data)
             const isUnknown = !isHeli && !category && !typecode;
 
+            const rotation = isUnknown ? 0 : track;
+
             if (flightMarkers[id]) {
                 flightMarkers[id].marker.setLngLat([lng, lat]);
-                // Rotate the INNER element, not the container
-                // Oppressor (unknown) stays upright (0deg)
-                const rotation = isUnknown ? 0 : track;
-                flightMarkers[id].el.style.transform = `rotate(${rotation}deg)`;
+                flightMarkers[id].marker.setRotation(rotation);
+
                 flightMarkers[id].lat = lat;
                 flightMarkers[id].lng = lng;
                 flightMarkers[id].velocity = gs;
@@ -575,18 +665,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     el.className = `flight-blip-base plane-type-${rand}`;
                 }
 
-                const rotation = isUnknown ? 0 : track;
-                el.style.transform = `rotate(${rotation}deg)`;
-
+                // Removed manual CSS rotation, now handled by MapLibre (setRotation + alignment: map)
                 container.appendChild(el);
 
                 const marker = new maplibregl.Marker({
                     element: container,
                     anchor: 'center',
-                    rotationAlignment: 'viewport',
-                    pitchAlignment: 'viewport'
+                    rotationAlignment: 'map', // Map-aligned rotation (True North)
+                    pitchAlignment: 'map'
                 })
                     .setLngLat([lng, lat])
+                    .setRotation(rotation)
                     .addTo(map);
 
                 flightMarkers[id] = { marker, el, lat, lng, velocity: gs, track };
@@ -1107,107 +1196,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Settings Logic ---
-    const usernameInput = document.getElementById('username-input');
-    const pfpInput = document.getElementById('pfp-input');
-    const colorInput = document.getElementById('color-input');
-    const sliders = document.querySelectorAll('.gta-slider');
 
-    function saveSettings() {
-        const flightToggle = document.getElementById('flight-radar-toggle');
-        const storesToggle = document.getElementById('stores-toggle');
-        const blipSlider = document.getElementById('blip-scale-slider');
-        const legendToggle = document.getElementById('legend-toggle');
-        const overlayToggle = document.getElementById('overlay-toggle');
-
-        const settings = {
-            username: usernameInput.value,
-            accentColor: colorInput.value,
-            avatar: document.querySelector('.avatar').src,
-            volume: volSlider ? volSlider.value : 80,
-            flightRadar: flightToggle ? flightToggle.innerText.includes('On') : true,
-            showStores: storesToggle ? storesToggle.innerText.includes('On') : true,
-            blipScale: blipSlider ? blipSlider.value : 1.0,
-            showLegend: legendToggle ? legendToggle.innerText.includes('On') : true,
-            showOverlay: overlayToggle ? overlayToggle.innerText.includes('On') : true
-        };
-        localStorage.setItem('gta_pause_settings', JSON.stringify(settings));
-    }
-
-    function loadSettings() {
-        const saved = localStorage.getItem('gta_pause_settings');
-        if (saved) {
-            const settings = JSON.parse(saved);
-
-            // Name
-            if (usernameInput) {
-                usernameInput.value = settings.username || 'PlayerOne';
-                document.querySelector('.username').innerText = usernameInput.value;
-            }
-
-            // Color
-            if (colorInput) {
-                colorInput.value = settings.accentColor || '#3498db';
-                document.documentElement.style.setProperty('--accent-color', colorInput.value);
-            }
-
-            // Lobby
-
-
-
-            // Avatar
-            if (settings.avatar) {
-                document.querySelector('.avatar').src = settings.avatar;
-            }
-
-            // Sliders
-            // BUG 1 FIX: volSlider is now hoisted to outer scope; assign here instead of re-declaring
-            volSlider = document.getElementById('volume-slider');
-            const blipSlider = document.getElementById('blip-scale-slider');
-
-            if (volSlider) {
-                volSlider.value = settings.volume || 80;
-                updateSliderVisuals(volSlider);
-            }
-
-            if (blipSlider) {
-                blipSlider.value = settings.blipScale || 1.0;
-                // Apply scale immediately
-                document.documentElement.style.setProperty('--blip-scale', blipSlider.value);
-                updateSliderVisuals(blipSlider);
-            }
-
-            // Flight Radar
-            const flightToggle = document.getElementById('flight-radar-toggle');
-            if (flightToggle && settings.hasOwnProperty('flightRadar')) {
-                flightToggle.innerText = settings.flightRadar ? '< On >' : '< Off >';
-                if (!settings.flightRadar) clearFlightBlips(); // Sync state
-            }
-
-            // Stores
-            const storesToggle = document.getElementById('stores-toggle');
-            if (storesToggle && settings.hasOwnProperty('showStores')) {
-                storesToggle.innerText = settings.showStores ? '< On >' : '< Off >';
-                if (!settings.showStores) clearStoreBlips();
-            }
-
-            // Legend
-            const legendToggle = document.getElementById('legend-toggle');
-            if (legendToggle && settings.hasOwnProperty('showLegend')) {
-                legendToggle.innerText = settings.showLegend ? '< On >' : '< Off >';
-                const legendEl = document.getElementById('player-legend');
-                if (legendEl) legendEl.classList.toggle('hidden', !settings.showLegend);
-            }
-
-            // Map Overlay
-            const overlayToggle = document.getElementById('overlay-toggle');
-            if (overlayToggle && settings.hasOwnProperty('showOverlay')) {
-                overlayToggle.innerText = settings.showOverlay ? '< On >' : '< Off >';
-                const overlayEl = document.getElementById('map-overlay-info');
-                if (overlayEl) overlayEl.classList.toggle('hidden', !settings.showOverlay);
-            }
-        }
-    }
 
     // Load initial settings
     loadSettings();
@@ -1306,11 +1295,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Flight Radar toggle
-    const flightRadarToggle = document.getElementById('flight-radar-toggle');
+    const flightRadarToggle = document.getElementById('flight-radar-toggle-btn');
     if (flightRadarToggle) {
         flightRadarToggle.addEventListener('click', () => {
             const isOn = flightRadarToggle.innerText.includes('On');
             flightRadarToggle.innerText = isOn ? '< Off >' : '< On >';
+
+            // Toggle Airport Layer Visibility
+            if (map && map.getLayer('airports-layer')) {
+                map.setLayoutProperty('airports-layer', 'visibility', isOn ? 'none' : 'visible');
+            }
+
             saveSettings();
 
             if (isOn) {

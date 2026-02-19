@@ -872,6 +872,7 @@ body {
     user-select: none;
     min-width: 80px;
     text-align: right;
+    pointer-events: auto !important;
 }
 
 .setting-toggle:hover {
@@ -1054,8 +1055,8 @@ body {
 
 /* Base Blip Style */
 .flight-blip-base {
-    width: 32px;
-    height: 32px;
+    width: var(--current-blip-size);
+    height: var(--current-blip-size);
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
@@ -1064,8 +1065,8 @@ body {
     /* This element will be rotated by JS: transform: rotate(Xdeg) */
     /* Absolute positioning to ensure it centers on the container (0,0) */
     position: absolute;
-    top: -16px;
-    left: -16px;
+    top: calc(var(--current-blip-size) / -2);
+    left: calc(var(--current-blip-size) / -2);
     box-shadow: none !important;
     filter: none !important;
 }
