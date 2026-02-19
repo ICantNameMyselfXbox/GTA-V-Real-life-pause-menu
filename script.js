@@ -470,11 +470,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const center = map.getCenter();
             const lat = center.lat.toFixed(4);
             const lon = center.lng.toFixed(4);
-            // 250nm radius ≈ 460km — covers a large region around whatever you're viewing
-            const dist = 250;
-            const url = `https://api.adsb.lol/v2/lat/${lat}/lon/${lon}/dist/${dist}`;
+            const dist = 250; // nm (~460km)
+            // airplanes.live — same ADS-B Exchange data, proper CORS headers for browser use
+            const url = `https://api.airplanes.live/v2/point/${lat}/${lon}/${dist}`;
 
-            console.log(`[RADAR] Fetching aircraft around map center (${lat}, ${lon}) r=${dist}nm...`);
+            console.log(`[RADAR] Fetching aircraft around map center (${lat}, ${lon}) r=${dist}nm via airplanes.live...`);
             lastFetchTimes.flights = Date.now();
 
             const response = await fetch(url);
