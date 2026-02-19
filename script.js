@@ -325,11 +325,25 @@ document.addEventListener('DOMContentLoaded', () => {
         // Start Predictive Glide Loop (every 100ms)
         setInterval(predictFlights, 250); // Reduced from 100ms to ease CPU load
 
-        // Map move: re-filter global aircraft cache to new viewport
-        let moveTimeout;
+        // Map move: re-fetch if center moved significantly, otherwise just re-filter cache
+        let lastFetchCenter = null;
         map.on('moveend', () => {
-            // Instantly re-render aircraft for new viewport from cached global data
-            applyViewportFilter();
+            const center = map.getCenter();
+            if (!lastFetchCenter) {
+                lastFetchCenter = center;
+            }
+            // Haversine-lite: degrees diff as proxy for distance (1° lat ≈ 111km)
+            const dLat = Math.abs(center.lat - lastFetchCenter.lat);
+            const dLng = Math.abs(center.lng - lastFetchCenter.lng) * Math.cos(center.lat * Math.PI / 180);
+            const degreeDist = Math.sqrt(dLat * dLat + dLng * dLng);
+            if (degreeDist > 1.5) {
+                // Panned ~165km+ from last fetch — get fresh data for new area
+                lastFetchCenter = center;
+                fetchFlights();
+            } else {
+                // Just re-filter the current cache to new viewport
+                applyViewportFilter();
+            }
         });
 
     }
@@ -452,9 +466,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            // adsb.lol global endpoint — all aircraft worldwide, native CORS, no proxy needed
-            const url = 'https://api.adsb.lol/v2/all';
-            console.log('[RADAR] Fetching ALL global aircraft via adsb.lol...');
+            // Use map VIEW CENTER so it works anywhere on the globe
+            const center = map.getCenter();
+            const lat = center.lat.toFixed(4);
+            const lon = center.lng.toFixed(4);
+            // 250nm radius ≈ 460km — covers a large region around whatever you're viewing
+            const dist = 250;
+            const url = `https://api.adsb.lol/v2/lat/${lat}/lon/${lon}/dist/${dist}`;
+
+            console.log(`[RADAR] Fetching aircraft around map center (${lat}, ${lon}) r=${dist}nm...`);
             lastFetchTimes.flights = Date.now();
 
             const response = await fetch(url);
@@ -468,13 +488,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (data && Array.isArray(data.ac)) {
-                console.log(`[RADAR] ✈ Global dataset: ${data.ac.length} aircraft. Filtering to viewport...`);
+                console.log(`[RADAR] ✈ Found ${data.ac.length} aircraft near map center.`);
                 flightCooldown = 60000;
-                // Cache full dataset so map pan/zoom can re-filter without re-fetching
-                allAircraftData = data.ac;
+                allAircraftData = data.ac; // cache for viewport filtering & pan re-use
                 applyViewportFilter();
             } else {
-                console.log('[RADAR] Empty response from adsb.lol');
+                console.log('[RADAR] No aircraft data in response.');
                 clearFlightBlips();
             }
 
@@ -485,7 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
         scheduleNextFlightFetch(flightCooldown);
     }
 
-    // Filter global cache to current map viewport and update blips
+    // Filter cached aircraft to current map viewport bounds
     function applyViewportFilter() {
         if (!allAircraftData || !map) return;
         const bounds = map.getBounds();
@@ -500,9 +519,10 @@ document.addEventListener('DOMContentLoaded', () => {
             ac.lon >= w && ac.lon <= e
         );
 
-        console.log(`[RADAR] Viewport shows ${visible.length} aircraft.`);
+        console.log(`[RADAR] Viewport: ${visible.length} visible aircraft.`);
         updateFlightBlips(visible);
     }
+
 
 
     function updateFlightBlips(aircraft) {
