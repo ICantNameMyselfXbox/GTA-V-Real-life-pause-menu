@@ -1052,8 +1052,8 @@ body {
     z-index: 500;
 }
 
-.plane-blip,
-.heli-blip {
+/* Base Blip Style */
+.flight-blip-base {
     width: 32px;
     height: 32px;
     background-size: contain;
@@ -1068,57 +1068,55 @@ body {
     left: -16px;
 }
 
-/* Default Plane Icon */
-.plane-blip {
+/* Specific Variants */
+.plane-type-0 {
     background-image: url('Blips/radar_player_plane.png');
 }
 
-/* Default Heli Icon */
-.heli-blip {
-    background-image: url('Blips/radar_player_heli.gif');
-}
-
-/* Specific Plane Variants */
-.plane-1 {
+.plane-type-1 {
     background-image: url('Blips/radar_player_plane1.png');
 }
 
-.plane-2 {
+.plane-type-2 {
     background-image: url('Blips/radar_player_plane2.png');
 }
 
-.plane-3 {
+.plane-type-3 {
     background-image: url('Blips/radar_player_plane3.png');
 }
 
-.plane-4 {
+.plane-type-4 {
     background-image: url('Blips/radar_player_plane4.png');
 }
 
-.plane-5 {
+.plane-type-5 {
     background-image: url('Blips/radar_player_plane5.png');
 }
 
-.plane-6 {
+.plane-type-6 {
     background-image: url('Blips/radar_player_plane6.png');
 }
 
-.plane-7 {
+.plane-type-7 {
     background-image: url('Blips/radar_player_plane7.png');
 }
 
-.plane-8 {
+.plane-type-8 {
     background-image: url('Blips/radar_player_plane8.png');
 }
 
-.plane-9 {
+.plane-type-9 {
     background-image: url('Blips/radar_player_plane9.png');
 }
 
-.plane-10 {
+.plane-type-10 {
     background-image: url('Blips/radar_player_plane10.png');
 }
 
-.plane-11 {
+.plane-type-11 {
     background-image: url('Blips/radar_player_plane11.png');
+}
+
+.heli-type {
+    background-image: url('Blips/radar_player_heli.gif');
 }

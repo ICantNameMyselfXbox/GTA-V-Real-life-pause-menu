@@ -550,14 +550,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 container.className = 'flight-blip-container';
 
                 // Inner element for rotation & icon
-                const el = document.createElement('div');
-                el.className = isHeli ? 'heli-blip' : 'plane-blip';
-                el.style.transform = `rotate(${track}deg)`;
-
-                if (!isHeli) {
+                // Use new specific type classes to avoid double-background issues
+                if (isHeli) {
+                    el.className = 'flight-blip-base heli-type';
+                } else {
                     const rand = Math.floor(Math.random() * 12);
-                    el.classList.add(`plane-${rand}`);
+                    el.className = `flight-blip-base plane-type-${rand}`;
                 }
+                el.style.transform = `rotate(${track}deg)`;
 
                 container.appendChild(el);
 
