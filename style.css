@@ -1078,51 +1078,47 @@ body {
     background-image: url('Blips/radar_player_heli.gif');
 }
 
-/* Variants (hue rotation for variety) */
-.plane-0 {
-    filter: hue-rotate(0deg);
-}
-
+/* Specific Plane Variants */
 .plane-1 {
-    filter: hue-rotate(30deg);
+    background-image: url('Blips/radar_player_plane1.png');
 }
 
 .plane-2 {
-    filter: hue-rotate(60deg);
+    background-image: url('Blips/radar_player_plane2.png');
 }
 
 .plane-3 {
-    filter: hue-rotate(90deg);
+    background-image: url('Blips/radar_player_plane3.png');
 }
 
 .plane-4 {
-    filter: hue-rotate(120deg);
+    background-image: url('Blips/radar_player_plane4.png');
 }
 
 .plane-5 {
-    filter: hue-rotate(150deg);
+    background-image: url('Blips/radar_player_plane5.png');
 }
 
 .plane-6 {
-    filter: hue-rotate(180deg);
+    background-image: url('Blips/radar_player_plane6.png');
 }
 
 .plane-7 {
-    filter: hue-rotate(210deg);
+    background-image: url('Blips/radar_player_plane7.png');
 }
 
 .plane-8 {
-    filter: hue-rotate(240deg);
+    background-image: url('Blips/radar_player_plane8.png');
 }
 
 .plane-9 {
-    filter: hue-rotate(270deg);
+    background-image: url('Blips/radar_player_plane9.png');
 }
 
 .plane-10 {
-    filter: hue-rotate(300deg);
+    background-image: url('Blips/radar_player_plane10.png');
 }
 
 .plane-11 {
-    filter: hue-rotate(330deg);
+    background-image: url('Blips/radar_player_plane11.png');
 }
