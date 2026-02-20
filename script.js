@@ -253,6 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let worldSyncInterval = null; // Track sync interval to avoid duplicates
 
 
+
     // --- Settings Logic ---
     const usernameInput = document.getElementById('username-input');
     const pfpInput = document.getElementById('pfp-input');
@@ -699,8 +700,25 @@ document.addEventListener('DOMContentLoaded', () => {
         flightMarkers = {};
     }
 
+    // Lobby tracking fallback system
+    const LOBBY_IDS = [
+        'GTA-V-UNIVERSAL-LOBBY-M4K0-ALPHA',
+        'GTA-V-UNIVERSAL-LOBBY-M4K0-BETA',
+        'GTA-V-UNIVERSAL-LOBBY-M4K0-GAMMA',
+        'GTA-V-UNIVERSAL-LOBBY-M4K0-DELTA'
+    ];
+    let currentLobbyIndex = 0;
+
     function initMultiplayer(lat, lng) {
-        if (isMultiplayerTransitioning) return;
+        const statusEl = document.querySelector('.connection-status');
+        const peerIdEl = document.getElementById('debug-peer-id');
+
+        if (isMultiplayerTransitioning) {
+            if (statusEl && !statusEl.innerText.includes('SWITCHING')) {
+                statusEl.innerText = "FINDING SESSION...";
+            }
+            return;
+        }
         isMultiplayerTransitioning = true;
 
         userPos.lat = lat;
@@ -713,11 +731,11 @@ document.addEventListener('DOMContentLoaded', () => {
         otherPlayers = {};
 
         // Universal Global Lobby ID - Everyone connects here
-        const hubId = 'GTA-V-UNIVERSAL-LOBBY-M4K0';
+        const hubId = LOBBY_IDS[currentLobbyIndex];
 
-        const statusEl = document.querySelector('.connection-status');
-        const peerIdEl = document.getElementById('debug-peer-id');
-        if (statusEl) statusEl.innerText = "FINDING SESSION...";
+        if (statusEl && !statusEl.innerText.includes('SWITCHING')) {
+            statusEl.innerText = "FINDING SESSION...";
+        }
 
         // PeerJS Config with expanded STUN servers for robust Global NAT traversal
         const peerConfig = {
@@ -928,10 +946,12 @@ document.addEventListener('DOMContentLoaded', () => {
             hubPeer.on('error', (err) => {
                 isMultiplayerTransitioning = false;
                 if (err.type === 'unavailable-id') {
-                    console.log('Hub ID taken. Backing off before reconnecting...');
+                    console.log('Hub ID ghosted! Trying next fallback lobby... >w<');
                     hubPeer.destroy();
-                    if (statusEl) statusEl.innerText = "LOBBY BUSY - RETRYING...";
-                    setTimeout(() => initMultiplayer(userPos.lat, userPos.lng), 5000);
+                    currentLobbyIndex = (currentLobbyIndex + 1) % LOBBY_IDS.length;
+                    const statusEl = document.querySelector('.connection-status');
+                    if (statusEl) statusEl.innerText = `SWITCHING TO LOBBY ${currentLobbyIndex + 1}...`;
+                    setTimeout(() => initMultiplayer(userPos.lat, userPos.lng), 2000);
                 } else {
                     console.error("Hub Error:", err);
                     if (statusEl) statusEl.innerText = "CONNECTION ERROR";
