@@ -193,7 +193,19 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error("Geolocation error:", error);
             const locName = document.querySelector('.location-name');
             if (locName) locName.innerText = "Location Unavailable";
+
+            // Initialization fallback if geolocation fails
+            if (!multiplayerInitialized) {
+                initMultiplayer(0, 0);
+                multiplayerInitialized = true;
+            }
         }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+    } else {
+        // Initialization fallback if geolocation is completely unsupported
+        if (!multiplayerInitialized) {
+            initMultiplayer(0, 0);
+            multiplayerInitialized = true;
+        }
     }
 
     // --- Network Awareness (Mobile Data / WiFi switching) ---
@@ -251,6 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let userPos = { lat: 0, lng: 0 }; // Global tracking
     let radarServiceInitialised = false; // New safety flag
     let worldSyncInterval = null; // Track sync interval to avoid duplicates
+    let isMultiplayerTransitioning = false; // Track connection state
 
 
 
