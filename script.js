@@ -21,10 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, { once: true });
 
-    // --- Radio System (Local Folders) ---
-    const radioAudio = new Audio();
-    radioAudio.volume = 0.5;
-
+    // --- Radio System (UTC Math Synced Streams) ---
     const radioStations = [
         { name: 'Radio Off', icon: '', songs: [] },
         { 
@@ -50,17 +47,25 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     let currentRadioIndex = 0;
-    let currentSongIndex = 0;
-    let globalRadioSyncData = null;
-    let masterRadios = {};
+    const RADIO_START_EPOCH = 1711756800000;
+    const stationAudios = {};
 
-    // Auto-play next song in folder when current ends
-    radioAudio.addEventListener('ended', () => {
-        const station = radioStations[currentRadioIndex];
-        if (station && station.songs && station.songs.length > 0) {
-            currentSongIndex = (currentSongIndex + 1) % station.songs.length;
-            radioAudio.src = station.songs[currentSongIndex];
-            radioAudio.play().catch(e => console.log('Radio track advance failed:', e));
+    // Initialize Continuous Radio Streams (Muted but perfectly mapped to UTC)
+    radioStations.forEach((station, index) => {
+        if (index > 0 && station.songs && station.songs.length > 0) {
+            let a = new Audio();
+            a.src = station.songs[0];
+            a.loop = true;
+            a.muted = true;
+            a.volume = document.getElementById('volume-slider') ? (document.getElementById('volume-slider').value / 100) : 0.5;
+            
+            // Wait for metadata to know exact duration for modulo math!
+            a.addEventListener('loadedmetadata', () => {
+                const elapsed = (Date.now() - RADIO_START_EPOCH) / 1000;
+                if (a.duration) a.currentTime = Math.abs(elapsed % a.duration);
+                a.play().catch(e => console.log('Background radio blocked:', e));
+            });
+            stationAudios[index] = a;
         }
     });
 
@@ -108,23 +113,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.classList.add('active');
                 currentRadioIndex = index;
 
+                Object.values(stationAudios).forEach(a => a.muted = true);
+                
                 if (station.songs.length === 0) {
                     // Radio Off
-                    radioAudio.pause();
                     sounds.music.play().catch(() => { });
                 } else {
-                    // Play Station
+                    // Play Station by unmuting its perpetual background audio
                     sounds.music.pause();
-                    
-                    if (globalRadioSyncData && globalRadioSyncData[index]) {
-                        currentSongIndex = globalRadioSyncData[index].songIndex;
-                        radioAudio.src = station.songs[currentSongIndex];
-                        radioAudio.currentTime = globalRadioSyncData[index].currentTime;
-                    } else {
-                        currentSongIndex = 0; // Start at first song
-                        radioAudio.src = station.songs[currentSongIndex];
+                    const a = stationAudios[index];
+                    if (a) {
+                        a.muted = false;
+                        
+                        // Force a resync check just in case browser suspended background tab
+                        if (a.duration && !a.paused) {
+                            const elapsed = (Date.now() - RADIO_START_EPOCH) / 1000;
+                            const targetTime = Math.abs(elapsed % a.duration);
+                            if (Math.abs(a.currentTime - targetTime) > 1.5) {
+                                a.currentTime = targetTime;
+                            }
+                        } else {
+                            a.play().catch(()=>{});
+                        }
                     }
-                    radioAudio.play().catch(e => console.log('Radio play failed:', e));
                 }
             });
 
@@ -971,30 +982,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                         updateLegend();
 
-                        // Client Radio Sync Handling
-                        if (data.radioSync) {
-                            globalRadioSyncData = data.radioSync;
-                            
-                            // If we are currently listening to a station, sync it!
-                            if (currentRadioIndex > 0 && data.radioSync[currentRadioIndex]) {
-                                const sync = data.radioSync[currentRadioIndex];
-                                
-                                // If song changed
-                                if (currentSongIndex !== sync.songIndex) {
-                                    currentSongIndex = sync.songIndex;
-                                    const st = radioStations[currentRadioIndex];
-                                    if (st && st.songs && st.songs[currentSongIndex]) {
-                                        radioAudio.src = st.songs[currentSongIndex];
-                                        radioAudio.play().catch(()=>{});
-                                    }
-                                }
-                                
-                                // If time is out of sync by more than 2.5 seconds, snap it
-                                if (Math.abs(radioAudio.currentTime - sync.currentTime) > 2.5) {
-                                    radioAudio.currentTime = sync.currentTime;
-                                }
-                            }
-                        }
                     }
                 });
             });
@@ -1043,24 +1030,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (peerIdEl) peerIdEl.innerText = hubId;
 
-                // Start Master Radios for global sync
-                masterRadios = {};
-                radioStations.forEach((station, index) => {
-                    if (index > 0 && station.songs && station.songs.length > 0) {
-                        let ma = new Audio();
-                        ma.muted = true; // Required for auto-play policy without interaction
-                        ma.src = station.songs[0];
-                        ma.play().catch(()=>{});
-                        ma.addEventListener('ended', () => {
-                            let mObj = masterRadios[index];
-                            mObj.songIndex = (mObj.songIndex + 1) % station.songs.length;
-                            ma.src = station.songs[mObj.songIndex];
-                            ma.play().catch(()=>{});
-                        });
-                        masterRadios[index] = { audio: ma, songIndex: 0 };
-                    }
-                });
-
                 // MASTER WORLD SYNC: Send the state of EVERYONE to EVERYBODY every 3s
                 if (worldSyncInterval) clearInterval(worldSyncInterval);
                 worldSyncInterval = setInterval(() => {
@@ -1085,18 +1054,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             lng: otherPlayers[id].lng,
                             name: otherPlayers[id].name
                         };
-                    }
-
-                    // Piggyback Radio Sync
-                    worldData.radioSync = {};
-                    for (let index in masterRadios) {
-                        const mr = masterRadios[index];
-                        if (mr && mr.audio) {
-                            worldData.radioSync[index] = {
-                                songIndex: mr.songIndex,
-                                currentTime: mr.audio.currentTime
-                            };
-                        }
                     }
 
                     connections.forEach(c => {
@@ -1567,9 +1524,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         sound.volume = slider.value / 100;
                     });
                 }
-                if (radioAudio) {
-                    radioAudio.volume = slider.value / 100;
-                }
+                Object.values(stationAudios).forEach(a => {
+                    a.volume = slider.value / 100;
+                });
             }
             debouncedSave(); // Debounced - only saves 500ms after user stops dragging
         });
