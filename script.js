@@ -21,38 +21,48 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, { once: true });
 
-    // --- Radio System (YouTube) ---
-    let ytPlayer = null;
-    let isYtReady = false;
-
-    window.onYouTubeIframeAPIReady = function () {
-        ytPlayer = new YT.Player('youtube-player', {
-            height: '0',
-            width: '0',
-            playerVars: {
-                'autoplay': 0,
-                'controls': 0,
-                'loop': 1
-            },
-            events: {
-                'onReady': () => {
-                    isYtReady = true;
-                    ytPlayer.setVolume(document.getElementById('volume-slider') ? document.getElementById('volume-slider').value : 80);
-                }
-            }
-        });
-    };
+    // --- Radio System (Local Folders) ---
+    const radioAudio = new Audio();
+    radioAudio.volume = 0.5;
 
     const radioStations = [
-        { name: 'Radio Off', icon: '', ytId: '' },
-        // Use 'PL...' for playlists, or standard video IDs
-        { name: 'Channel X', icon: 'Images/Radio/ChannelX.png', ytId: 'PLe8jmEHFkvsbT-hO8J2F4wAIfzB62y2sF' },
-        { name: 'East Los FM', icon: 'Images/Radio/EastLosFM.png', ytId: 'PL5CE2AC463673B8A8' },
-        { name: 'Non-Stop-Pop FM', icon: 'Images/Radio/NonStopPop.png', ytId: 'PLgbI0QcBNn5isOvlIN0rRK9Y6bSQdheii&si=zhozhhv2PhnEwWgV' },
-        { name: 'Radio Los Santos', icon: 'Images/Radio/RadioLosSantos.png', ytId: 'PLxKDEwB8QGIfP2L58lQ-Gk9S50mN_oO8g' }
+        { name: 'Radio Off', icon: '', songs: [] },
+        { 
+            name: 'Channel X', 
+            icon: 'Images/Radio/ChannelX.png', 
+            songs: window.RADIO_SONGS && window.RADIO_SONGS['Channel X'] ? window.RADIO_SONGS['Channel X'] : []
+        },
+        { 
+            name: 'East Los FM', 
+            icon: 'Images/Radio/EastLosFM.png', 
+            songs: window.RADIO_SONGS && window.RADIO_SONGS['East Los FM'] ? window.RADIO_SONGS['East Los FM'] : []
+        },
+        { 
+            name: 'Non-Stop-Pop FM', 
+            icon: 'Images/Radio/NonStopPop.png', 
+            songs: window.RADIO_SONGS && window.RADIO_SONGS['Non-Stop-Pop FM'] ? window.RADIO_SONGS['Non-Stop-Pop FM'] : []
+        },
+        { 
+            name: 'Radio Los Santos', 
+            icon: 'Images/Radio/RadioLosSantos.png', 
+            songs: window.RADIO_SONGS && window.RADIO_SONGS['Radio Los Santos'] ? window.RADIO_SONGS['Radio Los Santos'] : []
+        }
     ];
 
     let currentRadioIndex = 0;
+    let currentSongIndex = 0;
+    let globalRadioSyncData = null;
+    let masterRadios = {};
+
+    // Auto-play next song in folder when current ends
+    radioAudio.addEventListener('ended', () => {
+        const station = radioStations[currentRadioIndex];
+        if (station && station.songs && station.songs.length > 0) {
+            currentSongIndex = (currentSongIndex + 1) % station.songs.length;
+            radioAudio.src = station.songs[currentSongIndex];
+            radioAudio.play().catch(e => console.log('Radio track advance failed:', e));
+        }
+    });
 
     function initRadioWheel() {
         const wheel = document.getElementById('radio-wheel');
@@ -98,23 +108,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.classList.add('active');
                 currentRadioIndex = index;
 
-                if (!isYtReady || !ytPlayer) {
-                    console.log("YouTube Player not ready yet!");
-                    return;
-                }
-
-                if (station.ytId === '') {
+                if (station.songs.length === 0) {
                     // Radio Off
-                    ytPlayer.pauseVideo();
+                    radioAudio.pause();
                     sounds.music.play().catch(() => { });
                 } else {
                     // Play Station
                     sounds.music.pause();
-                    if (station.ytId.startsWith('PL')) {
-                        ytPlayer.loadPlaylist({ list: station.ytId, listType: 'playlist' });
+                    
+                    if (globalRadioSyncData && globalRadioSyncData[index]) {
+                        currentSongIndex = globalRadioSyncData[index].songIndex;
+                        radioAudio.src = station.songs[currentSongIndex];
+                        radioAudio.currentTime = globalRadioSyncData[index].currentTime;
                     } else {
-                        ytPlayer.loadVideoById(station.ytId);
+                        currentSongIndex = 0; // Start at first song
+                        radioAudio.src = station.songs[currentSongIndex];
                     }
+                    radioAudio.play().catch(e => console.log('Radio play failed:', e));
                 }
             });
 
@@ -960,6 +970,31 @@ document.addEventListener('DOMContentLoaded', () => {
                             }
                         }
                         updateLegend();
+
+                        // Client Radio Sync Handling
+                        if (data.radioSync) {
+                            globalRadioSyncData = data.radioSync;
+                            
+                            // If we are currently listening to a station, sync it!
+                            if (currentRadioIndex > 0 && data.radioSync[currentRadioIndex]) {
+                                const sync = data.radioSync[currentRadioIndex];
+                                
+                                // If song changed
+                                if (currentSongIndex !== sync.songIndex) {
+                                    currentSongIndex = sync.songIndex;
+                                    const st = radioStations[currentRadioIndex];
+                                    if (st && st.songs && st.songs[currentSongIndex]) {
+                                        radioAudio.src = st.songs[currentSongIndex];
+                                        radioAudio.play().catch(()=>{});
+                                    }
+                                }
+                                
+                                // If time is out of sync by more than 2.5 seconds, snap it
+                                if (Math.abs(radioAudio.currentTime - sync.currentTime) > 2.5) {
+                                    radioAudio.currentTime = sync.currentTime;
+                                }
+                            }
+                        }
                     }
                 });
             });
@@ -1008,6 +1043,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (peerIdEl) peerIdEl.innerText = hubId;
 
+                // Start Master Radios for global sync
+                masterRadios = {};
+                radioStations.forEach((station, index) => {
+                    if (index > 0 && station.songs && station.songs.length > 0) {
+                        let ma = new Audio();
+                        ma.muted = true; // Required for auto-play policy without interaction
+                        ma.src = station.songs[0];
+                        ma.play().catch(()=>{});
+                        ma.addEventListener('ended', () => {
+                            let mObj = masterRadios[index];
+                            mObj.songIndex = (mObj.songIndex + 1) % station.songs.length;
+                            ma.src = station.songs[mObj.songIndex];
+                            ma.play().catch(()=>{});
+                        });
+                        masterRadios[index] = { audio: ma, songIndex: 0 };
+                    }
+                });
+
                 // MASTER WORLD SYNC: Send the state of EVERYONE to EVERYBODY every 3s
                 if (worldSyncInterval) clearInterval(worldSyncInterval);
                 worldSyncInterval = setInterval(() => {
@@ -1032,6 +1085,18 @@ document.addEventListener('DOMContentLoaded', () => {
                             lng: otherPlayers[id].lng,
                             name: otherPlayers[id].name
                         };
+                    }
+
+                    // Piggyback Radio Sync
+                    worldData.radioSync = {};
+                    for (let index in masterRadios) {
+                        const mr = masterRadios[index];
+                        if (mr && mr.audio) {
+                            worldData.radioSync[index] = {
+                                songIndex: mr.songIndex,
+                                currentTime: mr.audio.currentTime
+                            };
+                        }
                     }
 
                     connections.forEach(c => {
@@ -1502,8 +1567,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         sound.volume = slider.value / 100;
                     });
                 }
-                if (typeof ytPlayer !== 'undefined' && ytPlayer && isYtReady) {
-                    ytPlayer.setVolume(slider.value);
+                if (radioAudio) {
+                    radioAudio.volume = slider.value / 100;
                 }
             }
             debouncedSave(); // Debounced - only saves 500ms after user stops dragging
