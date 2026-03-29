@@ -21,6 +21,114 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, { once: true });
 
+    // --- Radio System (YouTube) ---
+    let ytPlayer = null;
+    let isYtReady = false;
+
+    window.onYouTubeIframeAPIReady = function () {
+        ytPlayer = new YT.Player('youtube-player', {
+            height: '0',
+            width: '0',
+            playerVars: {
+                'autoplay': 0,
+                'controls': 0,
+                'loop': 1
+            },
+            events: {
+                'onReady': () => {
+                    isYtReady = true;
+                    ytPlayer.setVolume(document.getElementById('volume-slider') ? document.getElementById('volume-slider').value : 80);
+                }
+            }
+        });
+    };
+
+    const radioStations = [
+        { name: 'Radio Off', icon: '', ytId: '' },
+        // Use 'PL...' for playlists, or standard video IDs
+        { name: 'Channel X', icon: 'Images/Radio/ChannelX.png', ytId: 'PLe8jmEHFkvsbT-hO8J2F4wAIfzB62y2sF' },
+        { name: 'East Los FM', icon: 'Images/Radio/EastLosFM.png', ytId: 'PL5CE2AC463673B8A8' },
+        { name: 'Non-Stop-Pop FM', icon: 'Images/Radio/NonStopPop.png', ytId: 'PLgbI0QcBNn5isOvlIN0rRK9Y6bSQdheii&si=zhozhhv2PhnEwWgV' },
+        { name: 'Radio Los Santos', icon: 'Images/Radio/RadioLosSantos.png', ytId: 'PLxKDEwB8QGIfP2L58lQ-Gk9S50mN_oO8g' }
+    ];
+
+    let currentRadioIndex = 0;
+
+    function initRadioWheel() {
+        const wheel = document.getElementById('radio-wheel');
+        const infoName = document.getElementById('radio-station-name');
+        if (!wheel) return;
+
+        wheel.innerHTML = '';
+        const total = radioStations.length;
+        const radius = 240; // distance from center
+
+        radioStations.forEach((station, index) => {
+            // Calculate angle: start at top (-90 deg)
+            const angle = (index / total) * (Math.PI * 2) - (Math.PI / 2);
+
+            // Container center is 50%, 50%. We use percentages for absolute positioning.
+            const x = 50 + (Math.cos(angle) * (radius / 300) * 50); // 300 is half of 600px container width
+            const y = 50 + (Math.sin(angle) * (radius / 300) * 50);
+
+            const el = document.createElement('div');
+            el.className = 'radio-station';
+            el.style.left = `${x}%`;
+            el.style.top = `${y}%`;
+
+            if (station.icon) {
+                el.style.backgroundImage = `url('${station.icon}')`;
+            } else {
+                // Radio Off placeholder
+                el.innerHTML = '<div style="width:100%;height:100%;display:flex;justify-content:center;align-items:center;font-size:32px;border:3px solid #ccc;border-radius:50%;color:#ccc;">🚫</div>';
+            }
+
+            if (index === currentRadioIndex) el.classList.add('active');
+
+            // Hover event: update central text
+            el.addEventListener('mouseenter', () => {
+                infoName.innerText = station.name;
+                sounds.changeOption.currentTime = 0;
+                sounds.changeOption.play().catch(() => { });
+            });
+
+            // Click event: select station
+            el.addEventListener('click', () => {
+                document.querySelectorAll('.radio-station').forEach(s => s.classList.remove('active'));
+                el.classList.add('active');
+                currentRadioIndex = index;
+
+                if (!isYtReady || !ytPlayer) {
+                    console.log("YouTube Player not ready yet!");
+                    return;
+                }
+
+                if (station.ytId === '') {
+                    // Radio Off
+                    ytPlayer.pauseVideo();
+                    sounds.music.play().catch(() => { });
+                } else {
+                    // Play Station
+                    sounds.music.pause();
+                    if (station.ytId.startsWith('PL')) {
+                        ytPlayer.loadPlaylist({ list: station.ytId, listType: 'playlist' });
+                    } else {
+                        ytPlayer.loadVideoById(station.ytId);
+                    }
+                }
+            });
+
+            wheel.appendChild(el);
+        });
+
+        // Reset info name on mouse leave wheel
+        document.getElementById('radio').addEventListener('mouseleave', () => {
+            infoName.innerText = radioStations[currentRadioIndex].name;
+        });
+    }
+
+    initRadioWheel();
+
     // --- Tab Navigation ---
     const navItems = document.querySelectorAll('.nav-item');
     const tabContents = document.querySelectorAll('.tab-content');
@@ -1393,6 +1501,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     Object.values(sounds).forEach(sound => {
                         sound.volume = slider.value / 100;
                     });
+                }
+                if (typeof ytPlayer !== 'undefined' && ytPlayer && isYtReady) {
+                    ytPlayer.setVolume(slider.value);
                 }
             }
             debouncedSave(); // Debounced - only saves 500ms after user stops dragging
