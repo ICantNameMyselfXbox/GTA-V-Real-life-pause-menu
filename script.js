@@ -263,6 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let userPos = { lat: 0, lng: 0 }; // Global tracking
     let radarServiceInitialised = false; // New safety flag
     let worldSyncInterval = null; // Track sync interval to avoid duplicates
+    let heartbeatInterval = null; // Fix for heartbeat ReferenceError
     let isMultiplayerTransitioning = false; // Track connection state
 
 
@@ -832,7 +833,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                         // Remove players no longer in the world sync
                         for (let id in otherPlayers) {
-                            if (!incomingIds.has(id) && id !== myPeerId) {
+                            if (!incomingIds.has(id)) {
                                 otherPlayers[id].marker.remove();
                                 delete otherPlayers[id];
                             }
@@ -908,7 +909,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     };
 
                     // Add Hub's own position
-                    worldData.players[hubId] = {
+                    worldData.players[mySessionId] = {
                         sessionId: mySessionId,
                         lat: userPos.lat,
                         lng: userPos.lng,
@@ -1015,11 +1016,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Don't draw blips at 0,0
         if (Math.abs(data.lat) < 0.0001 && Math.abs(data.lng) < 0.0001) return;
 
-        // Proximity Guard: If blip is within ~10 meters of us, it's probably a stale version of us
-        // (0.0001 degrees is roughly 10 meters)
-        const latDiff = Math.abs(data.lat - (userPos.lat || 0));
-        const lngDiff = Math.abs(data.lng - (userPos.lng || 0));
-        if (latDiff < 0.0001 && lngDiff < 0.0001) return;
+        // Proximity Guard: Removed to allow local testing to work!
+        // Local testing on the same IP / coords used to fail here.
+        // const latDiff = Math.abs(data.lat - (userPos.lat || 0));
+        // const lngDiff = Math.abs(data.lng - (userPos.lng || 0));
+        // if (latDiff < 0.0001 && lngDiff < 0.0001) return;
 
         if (otherPlayers[id]) {
             otherPlayers[id].marker.setLngLat([data.lng, data.lat]);
