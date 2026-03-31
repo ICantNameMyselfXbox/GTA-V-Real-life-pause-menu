@@ -1140,8 +1140,8 @@ body {
 
 .radio-tab-container {
     position: relative;
-    width: 800px;
-    height: 800px;
+    width: 950px;
+    height: 950px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -1158,10 +1158,10 @@ body {
 
 .radio-station {
     position: absolute;
-    width: 64px;
-    height: 64px;
-    margin-left: -32px;
-    margin-top: -32px;
+    width: 88px;
+    height: 88px;
+    margin-left: -44px;
+    margin-top: -44px;
     border-radius: 50%;
     background-size: 80% auto; /* Fit inside the circle */
     background-repeat: no-repeat;
@@ -1193,7 +1193,7 @@ body {
 
 .radio-station-name {
     font-family: 'Oswald', sans-serif;
-    font-size: 2rem;
+    font-size: 2.5rem;
     font-weight: 700;
     text-transform: uppercase;
     text-shadow: 0 2px 5px rgba(0,0,0,0.8);

@@ -126,15 +126,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         wheel.innerHTML = '';
         const total = radioStations.length;
-        const radius = 340; // Increased distance from center to prevent stations from touching
+        const radius = 400; // Increased distance from center to prevent stations from touching
 
         radioStations.forEach((station, index) => {
             // Calculate angle: start at top (-90 deg)
             const angle = (index / total) * (Math.PI * 2) - (Math.PI / 2);
 
             // Container center is 50%, 50%. We use percentages for absolute positioning.
-            const x = 50 + (Math.cos(angle) * (radius / 400) * 50); // 400 is half of 800px container width
-            const y = 50 + (Math.sin(angle) * (radius / 400) * 50);
+            const x = 50 + (Math.cos(angle) * (radius / 475) * 50); // 475 is half of 950px container width
+            const y = 50 + (Math.sin(angle) * (radius / 475) * 50);
 
             const el = document.createElement('div');
             el.className = 'radio-station';
