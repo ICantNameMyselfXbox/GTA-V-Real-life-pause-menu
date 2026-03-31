@@ -190,7 +190,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     sounds.music.play().catch(() => { });
                     console.log("Playing background ambiance...");
                 } else {
-                    const targetVolume = document.getElementById('volume-slider') ? (document.getElementById('volume-slider').value / 100) : 0.5;
+                    const radioVolSlider = document.getElementById('radio-volume-slider');
+                    const targetVolume = radioVolSlider ? (radioVolSlider.value / 100) : 0.5;
 
                     if (stationWidgets[index]) {
                         // Play SoundCloud
@@ -507,7 +508,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             blipScale: blipSlider ? blipSlider.value : 1.0,
             showLegend: legendToggle ? legendToggle.innerText.includes('On') : true,
-            showOverlay: overlayToggle ? overlayToggle.innerText.includes('On') : true
+            showOverlay: overlayToggle ? overlayToggle.innerText.includes('On') : true,
+            radioVolume: document.getElementById('radio-volume-slider')?.value || 50
         };
         localStorage.setItem('gta_pause_settings', JSON.stringify(settings));
     }
@@ -581,6 +583,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 overlayToggle.innerText = settings.showOverlay ? '< On >' : '< Off >';
                 const overlayEl = document.getElementById('map-overlay-info');
                 if (overlayEl) overlayEl.classList.toggle('hidden', !settings.showOverlay);
+            }
+
+            // Radio Volume ^~^
+            const radioVolSlider = document.getElementById('radio-volume-slider');
+            if (radioVolSlider && settings.hasOwnProperty('radioVolume')) {
+                radioVolSlider.value = settings.radioVolume;
+                updateSliderVisuals(radioVolSlider);
             }
         }
     }
@@ -1636,6 +1645,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 Object.keys(stationWidgets).forEach(key => {
                     if (parseInt(key) === currentRadioIndex) {
                         stationWidgets[key].setVolume(slider.value); // SC is 0-100
+                    }
+                });
+            } else if (slider.id === 'radio-volume-slider') {
+                // Update Active Radio Volume >w<
+                Object.keys(stationWidgets).forEach(key => {
+                    if (parseInt(key) === currentRadioIndex) {
+                        stationWidgets[key].setVolume(slider.value); // SC is 0-100
+                    }
+                });
+                Object.keys(directAudioPlayers).forEach(key => {
+                    if (parseInt(key) === currentRadioIndex) {
+                        directAudioPlayers[key].volume = slider.value / 100;
                     }
                 });
             }
