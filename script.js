@@ -21,53 +21,103 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }, { once: true });
 
-    // --- Radio System (UTC Math Synced Streams) ---
+    // --- Radio System (SoundCloud Widget Synced Streams) ---
     const radioStations = [
-        { name: 'Radio Off', icon: '', songs: [] },
-        { 
-            name: 'Channel X', 
-            icon: 'Images/Radio/ChannelX.png', 
-            songs: window.RADIO_SONGS && window.RADIO_SONGS['Channel X'] ? window.RADIO_SONGS['Channel X'] : []
-        },
-        { 
-            name: 'East Los FM', 
-            icon: 'Images/Radio/EastLosFM.png', 
-            songs: window.RADIO_SONGS && window.RADIO_SONGS['East Los FM'] ? window.RADIO_SONGS['East Los FM'] : []
-        },
-        { 
-            name: 'Non-Stop-Pop FM', 
-            icon: 'Images/Radio/NonStopPop.png', 
-            songs: window.RADIO_SONGS && window.RADIO_SONGS['Non-Stop-Pop FM'] ? window.RADIO_SONGS['Non-Stop-Pop FM'] : []
-        },
-        { 
-            name: 'Radio Los Santos', 
-            icon: 'Images/Radio/RadioLosSantos.png', 
-            songs: window.RADIO_SONGS && window.RADIO_SONGS['Radio Los Santos'] ? window.RADIO_SONGS['Radio Los Santos'] : []
-        }
+        { name: 'Radio Off', icon: '', soundcloudUrl: null }
     ];
+
+    if (window.RADIO_SONGS) {
+        for (const [name, data] of Object.entries(window.RADIO_SONGS)) {
+            radioStations.push({
+                name: name,
+                icon: data.icon,
+                soundcloudUrl: data.soundcloud
+            });
+        }
+    }
 
     let currentRadioIndex = 0;
     const RADIO_START_EPOCH = 1711756800000;
-    const stationAudios = {};
+    const stationWidgets = {};
+    const stationDurations = {};
+    const directAudioPlayers = {}; // For non-SoundCloud links
 
-    // Initialize Continuous Radio Streams (Muted but perfectly mapped to UTC)
+    // --- Radio Progress Persistence ---
+    function loadRadioProgress() {
+        const saved = localStorage.getItem('gta_radio_progress');
+        return saved ? JSON.parse(saved) : {};
+    }
+
+    function saveRadioProgress(stationName, time) {
+        const progress = loadRadioProgress();
+        progress[stationName] = time;
+        localStorage.setItem('gta_radio_progress', JSON.stringify(progress));
+    }
+
+    const radioProgress = loadRadioProgress();
+
+    // Initialize Radio Streams
+    const scContainer = document.getElementById('radio-streams-container');
+
     radioStations.forEach((station, index) => {
-        if (index > 0 && station.songs && station.songs.length > 0) {
-            let a = new Audio();
-            a.src = station.songs[0];
-            a.loop = true;
-            a.muted = true;
-            a.volume = document.getElementById('volume-slider') ? (document.getElementById('volume-slider').value / 100) : 0.5;
-            
-            // Wait for metadata to know exact duration for modulo math!
-            a.addEventListener('loadedmetadata', () => {
-                const elapsed = (Date.now() - RADIO_START_EPOCH) / 1000;
-                if (a.duration) a.currentTime = Math.abs(elapsed % a.duration);
-                a.play().catch(e => console.log('Background radio blocked:', e));
+        if (index === 0 || !station.soundcloudUrl) return;
+
+        const isSoundCloud = typeof station.soundcloudUrl === 'string' && station.soundcloudUrl.includes('soundcloud.com');
+
+        if (isSoundCloud && window.SC && window.SC.Widget) {
+            // --- SoundCloud Setup ---
+            const iframe = document.createElement('iframe');
+            let src = station.soundcloudUrl;
+            if (!src.includes('enable_api')) {
+                src += (src.includes('?') ? '&' : '?') + 'enable_api=1';
+            }
+            iframe.src = src;
+            iframe.id = `sc-widget-${index}`;
+            iframe.width = "100%";
+            iframe.height = "166";
+            iframe.allow = "autoplay";
+            iframe.style.display = "none";
+            if (scContainer) scContainer.appendChild(iframe);
+
+            const widget = SC.Widget(iframe);
+            stationWidgets[index] = widget;
+
+            widget.bind(SC.Widget.Events.READY, () => {
+                widget.setVolume(0);
+                widget.getDuration((duration) => {
+                    stationDurations[index] = duration;
+                    widget.play();
+                });
             });
-            stationAudios[index] = a;
+        } else if (!isSoundCloud) {
+            // --- Local / Direct Audio Setup ---
+            const audio = new Audio(station.soundcloudUrl);
+            audio.loop = true;
+            audio.volume = 0;
+            // Preload metadata to avoid lag on first play
+            audio.preload = "metadata";
+
+            // Restore saved progress if available
+            if (radioProgress[station.name]) {
+                audio.currentTime = radioProgress[station.name];
+            }
+
+            // Periodically save progress while playing
+            let lastSaveTime = 0;
+            audio.addEventListener('timeupdate', () => {
+                const now = audio.currentTime;
+                if (!audio.paused && Math.abs(now - lastSaveTime) > 2) {
+                    saveRadioProgress(station.name, now);
+                    lastSaveTime = now;
+                }
+            });
+
+            directAudioPlayers[index] = audio;
         }
     });
+
+    // Note: Synchronization logic was removed per user request for simplicity.
+
 
     function initRadioWheel() {
         const wheel = document.getElementById('radio-wheel');
@@ -76,15 +126,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         wheel.innerHTML = '';
         const total = radioStations.length;
-        const radius = 240; // distance from center
+        const radius = 340; // Increased distance from center to prevent stations from touching
 
         radioStations.forEach((station, index) => {
             // Calculate angle: start at top (-90 deg)
             const angle = (index / total) * (Math.PI * 2) - (Math.PI / 2);
 
             // Container center is 50%, 50%. We use percentages for absolute positioning.
-            const x = 50 + (Math.cos(angle) * (radius / 300) * 50); // 300 is half of 600px container width
-            const y = 50 + (Math.sin(angle) * (radius / 300) * 50);
+            const x = 50 + (Math.cos(angle) * (radius / 400) * 50); // 400 is half of 800px container width
+            const y = 50 + (Math.sin(angle) * (radius / 400) * 50);
 
             const el = document.createElement('div');
             el.className = 'radio-station';
@@ -92,7 +142,21 @@ document.addEventListener('DOMContentLoaded', () => {
             el.style.top = `${y}%`;
 
             if (station.icon) {
-                el.style.backgroundImage = `url('${station.icon}')`;
+                if (station.icon.toLowerCase().endsWith('.webm')) {
+                    const video = document.createElement('video');
+                    video.src = station.icon;
+                    video.autoplay = true;
+                    video.loop = true;
+                    video.muted = true;
+                    video.playsInline = true;
+                    video.style.width = '100%';
+                    video.style.height = '100%';
+                    video.style.objectFit = 'contain';
+                    video.style.borderRadius = '50%';
+                    el.appendChild(video);
+                } else {
+                    el.style.backgroundImage = `url('${station.icon}')`;
+                }
             } else {
                 // Radio Off placeholder
                 el.innerHTML = '<div style="width:100%;height:100%;display:flex;justify-content:center;align-items:center;font-size:32px;border:3px solid #ccc;border-radius:50%;color:#ccc;">🚫</div>';
@@ -113,28 +177,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 el.classList.add('active');
                 currentRadioIndex = index;
 
-                Object.values(stationAudios).forEach(a => a.muted = true);
+                // Stop All Audio Sources
+                Object.values(stationWidgets).forEach(w => w.setVolume(0));
+                Object.values(directAudioPlayers).forEach(a => {
+                    a.pause();
+                    // a.currentTime = 0; // Removed per user request to save progress! >w<
+                });
+                sounds.music.pause();
                 
-                if (station.songs.length === 0) {
-                    // Radio Off
+                if (index === 0 || !station.soundcloudUrl) {
+                    // Radio Off or Placeholder -> Play Background Music
                     sounds.music.play().catch(() => { });
+                    console.log("Playing background ambiance...");
                 } else {
-                    // Play Station by unmuting its perpetual background audio
-                    sounds.music.pause();
-                    const a = stationAudios[index];
-                    if (a) {
-                        a.muted = false;
-                        
-                        // Force a resync check just in case browser suspended background tab
-                        if (a.duration && !a.paused) {
-                            const elapsed = (Date.now() - RADIO_START_EPOCH) / 1000;
-                            const targetTime = Math.abs(elapsed % a.duration);
-                            if (Math.abs(a.currentTime - targetTime) > 1.5) {
-                                a.currentTime = targetTime;
-                            }
-                        } else {
-                            a.play().catch(()=>{});
-                        }
+                    const targetVolume = document.getElementById('volume-slider') ? (document.getElementById('volume-slider').value / 100) : 0.5;
+
+                    if (stationWidgets[index]) {
+                        // Play SoundCloud
+                        const widget = stationWidgets[index];
+                        widget.setVolume(targetVolume * 100);
+                        console.log(`Streaming SoundCloud: ${station.name}`);
+                    } else if (directAudioPlayers[index]) {
+                        // Play Direct Stream
+                        const player = directAudioPlayers[index];
+                        player.volume = targetVolume;
+                        player.play().catch(e => console.error("Streaming failed:", e));
+                        console.log(`Streaming Direct: ${station.name}`);
                     }
                 }
             });
@@ -224,6 +292,20 @@ document.addEventListener('DOMContentLoaded', () => {
         startFlightRadar();
         initStaticMapLayers();
         initStaticBlips();
+
+        // Map interaction: stop following if user manually moves/interacts with map
+        map.on('dragstart', () => {
+            if (followTarget) {
+                console.log("Follow mode DISABLED due to manual map move.");
+                followTarget = null;
+            }
+        });
+        map.on('wheel', () => {
+            if (followTarget) {
+                console.log("Follow mode DISABLED due to manual zoom.");
+                followTarget = null;
+            }
+        });
     });
 
     // Add navigation controls (optional, keep minimal for GTA style)
@@ -308,6 +390,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // Always update lastMapPos with current GPS position
             lastMapPos = { lat, lng };
 
+            // Follow mode for self
+            if (followTarget === 'self') {
+                map.flyTo({ center: [lng, lat], essential: true });
+            }
+
             // Update Coordinates Display
             const coordText = document.querySelector('.coordinates');
             if (coordText) {
@@ -390,6 +477,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let connections = []; // Track connections if we are the hub
     let flightMarkers = {};
     let userPos = { lat: 0, lng: 0 }; // Global tracking
+    let followTarget = null; // null, 'self', or sessionId
     let radarServiceInitialised = false; // New safety flag
     let worldSyncInterval = null; // Track sync interval to avoid duplicates
     let heartbeatInterval = null; // Fix for heartbeat ReferenceError
@@ -1156,6 +1244,12 @@ document.addEventListener('DOMContentLoaded', () => {
             otherPlayers[id].marker.setLngLat([data.lng, data.lat]);
             otherPlayers[id].lat = data.lat;
             otherPlayers[id].lng = data.lng;
+
+            // Follow mode for others
+            if (followTarget === id) {
+                map.flyTo({ center: [data.lng, data.lat], essential: true });
+            }
+
             otherPlayers[id].name = data.name || "Unknown Player";
             otherPlayers[id].sessionId = data.sessionId;
             otherPlayers[id].lastUpdate = Date.now();
@@ -1239,29 +1333,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
         legendList.innerHTML = '';
 
-        // Self entry — not clickable, uses Player blip
+        // Self entry — clickable, centers map on YOU
         const selfName = document.querySelector('.username')?.innerText || 'YOU';
         const selfEntry = document.createElement('div');
-        selfEntry.className = 'legend-entry';
+        selfEntry.className = 'legend-entry clickable';
+        selfEntry.title = `Center on YOU`;
         selfEntry.innerHTML = `
             <span class="legend-name self">${selfName}</span>
             <div class="legend-blip self"></div>
         `;
+        selfEntry.addEventListener('click', () => {
+            if (userPos.lat && userPos.lng) {
+                followTarget = 'self';
+                map.flyTo({ center: [userPos.lng, userPos.lat], zoom: Math.max(map.getZoom(), 15), essential: true });
+                console.log("Following YOU");
+            }
+        });
         legendList.appendChild(selfEntry);
 
-        // Other players — clickable, fly to their position
+        // Other players — clickable, fly to their position & follow
         for (let id in otherPlayers) {
             const p = otherPlayers[id];
             const entry = document.createElement('div');
             entry.className = 'legend-entry clickable';
-            entry.title = `Center on ${p.name || 'Player'}`;
+            entry.title = `Center & Follow ${p.name || 'Player'}`;
             entry.innerHTML = `
                 <span class="legend-name">${p.name || 'Unknown'}</span>
                 <div class="legend-blip other"></div>
             `;
             entry.addEventListener('click', () => {
                 if (p.lat && p.lng) {
-                    map.flyTo({ center: [p.lng, p.lat], zoom: Math.max(map.getZoom(), 14), essential: true });
+                    followTarget = id;
+                    map.flyTo({ center: [p.lng, p.lat], zoom: Math.max(map.getZoom(), 15), essential: true });
+                    console.log(`Following ${p.name}`);
                 }
             });
             legendList.appendChild(entry);
@@ -1270,6 +1374,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initial legend render (just self)
     updateLegend();
+
+    // Stop following on map drag
+    map.on('dragstart', () => {
+        followTarget = null;
+    });
 
 
     // Weather API (Open-Meteo)
@@ -1524,8 +1633,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         sound.volume = slider.value / 100;
                     });
                 }
-                Object.values(stationAudios).forEach(a => {
-                    a.volume = slider.value / 100;
+                Object.keys(stationWidgets).forEach(key => {
+                    if (parseInt(key) === currentRadioIndex) {
+                        stationWidgets[key].setVolume(slider.value); // SC is 0-100
+                    }
                 });
             }
             debouncedSave(); // Debounced - only saves 500ms after user stops dragging

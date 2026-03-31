@@ -1140,8 +1140,8 @@ body {
 
 .radio-tab-container {
     position: relative;
-    width: 600px;
-    height: 600px;
+    width: 800px;
+    height: 800px;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -1163,13 +1163,15 @@ body {
     margin-left: -32px;
     margin-top: -32px;
     border-radius: 50%;
-    background-size: cover;
+    background-size: 80% auto; /* Fit inside the circle */
+    background-repeat: no-repeat;
     background-position: center;
+    background-color: rgba(255, 255, 255, 0.05); /* Subtle dark circle background */
     cursor: pointer;
     pointer-events: auto;
     filter: grayscale(100%) opacity(0.5);
-    transition: filter 0.2s ease, box-shadow 0.2s ease;
-    border: 2px solid transparent; /* Prevent size shifting */
+    transition: all 0.2s ease;
+    border: 2px solid rgba(255, 255, 255, 0.1);
 }
 
 .radio-station:hover {
