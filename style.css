@@ -277,92 +277,6 @@ body {
 }
 
 /* ── Flight Blips ─────────────────────────────────────── */
-.plane-blip,
-.heli-blip {
-    width: 0;
-    height: 0;
-    position: relative;
-    pointer-events: none;
-    display: block;
-}
-
-.plane-blip::after,
-.heli-blip::after {
-    content: '';
-    display: block;
-    position: absolute;
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    filter: drop-shadow(0 0 2px black);
-    opacity: 0.9;
-}
-
-/* Default plane icon (fallback) */
-.plane-blip::after {
-    width: var(--current-blip-size);
-    height: var(--current-blip-size);
-    top: calc(var(--current-blip-size) / -2);
-    left: calc(var(--current-blip-size) / -2);
-    background-image: url('Blips/radar_player_plane.png');
-}
-
-.heli-blip::after {
-    width: calc(var(--current-blip-size) * 1.2);
-    height: calc(var(--current-blip-size) * 1.2);
-    top: calc(var(--current-blip-size) * -0.6);
-    left: calc(var(--current-blip-size) * -0.6);
-    background-image: url('Blips/radar_player_heli.gif');
-}
-
-/* Plane variant icons */
-.plane-blip.plane-0::after {
-    background-image: url('Blips/radar_player_plane.png');
-}
-
-.plane-blip.plane-1::after {
-    background-image: url('Blips/radar_player_plane1.png');
-}
-
-.plane-blip.plane-2::after {
-    background-image: url('Blips/radar_player_plane2.png');
-}
-
-.plane-blip.plane-3::after {
-    background-image: url('Blips/radar_player_plane3.png');
-}
-
-.plane-blip.plane-4::after {
-    background-image: url('Blips/radar_player_plane4.png');
-}
-
-.plane-blip.plane-5::after {
-    background-image: url('Blips/radar_player_plane5.png');
-}
-
-.plane-blip.plane-6::after {
-    background-image: url('Blips/radar_player_plane6.png');
-}
-
-.plane-blip.plane-7::after {
-    background-image: url('Blips/radar_player_plane7.png');
-}
-
-.plane-blip.plane-8::after {
-    background-image: url('Blips/radar_player_plane8.png');
-}
-
-.plane-blip.plane-9::after {
-    background-image: url('Blips/radar_player_plane9.png');
-}
-
-.plane-blip.plane-10::after {
-    background-image: url('Blips/radar_player_plane10.png');
-}
-
-.plane-blip.plane-11::after {
-    background-image: url('Blips/radar_player_plane11.png');
-}
 
 
 
@@ -394,45 +308,6 @@ body {
     letter-spacing: 1px;
     font-weight: bold;
     text-transform: uppercase;
-}
-
-/* Flight Blips */
-.plane-blip,
-.heli-blip {
-    width: 0;
-    height: 0;
-    position: relative;
-    pointer-events: none;
-    display: block;
-}
-
-.plane-blip::after,
-.heli-blip::after {
-    content: '';
-    display: block;
-    position: absolute;
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    filter: drop-shadow(0 0 2px black);
-    opacity: 0.9;
-}
-
-.plane-blip::after {
-    width: var(--current-blip-size);
-    height: var(--current-blip-size);
-    top: calc(var(--current-blip-size) / -2);
-    left: calc(var(--current-blip-size) / -2);
-    background-image: url('Blips/radar_player_plane.png');
-}
-
-.heli-blip::after {
-    /* Helis slightly larger visually, but can scale same or relative */
-    width: calc(var(--current-blip-size) * 1.2);
-    height: calc(var(--current-blip-size) * 1.2);
-    top: calc(var(--current-blip-size) * -0.6);
-    left: calc(var(--current-blip-size) * -0.6);
-    background-image: url('Blips/radar_player_heli.gif');
 }
 
 .airport-blip {
@@ -498,55 +373,6 @@ body {
     background-position: center;
     filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.8));
     opacity: 0.95;
-}
-
-/* Plane variants - assigned via JS class */
-.plane-blip.plane-0::after {
-    background-image: url('Blips/radar_player_plane.png');
-}
-
-.plane-blip.plane-1::after {
-    background-image: url('Blips/radar_player_plane1.png');
-}
-
-.plane-blip.plane-2::after {
-    background-image: url('Blips/radar_player_plane2.png');
-}
-
-.plane-blip.plane-3::after {
-    background-image: url('Blips/radar_player_plane3.png');
-}
-
-.plane-blip.plane-4::after {
-    background-image: url('Blips/radar_player_plane4.png');
-}
-
-.plane-blip.plane-5::after {
-    background-image: url('Blips/radar_player_plane5.png');
-}
-
-.plane-blip.plane-6::after {
-    background-image: url('Blips/radar_player_plane6.png');
-}
-
-.plane-blip.plane-7::after {
-    background-image: url('Blips/radar_player_plane7.png');
-}
-
-.plane-blip.plane-8::after {
-    background-image: url('Blips/radar_player_plane8.png');
-}
-
-.plane-blip.plane-9::after {
-    background-image: url('Blips/radar_player_plane9.png');
-}
-
-.plane-blip.plane-10::after {
-    background-image: url('Blips/radar_player_plane10.png');
-}
-
-.plane-blip.plane-11::after {
-    background-image: url('Blips/radar_player_plane11.png');
 }
 
 /* Flight Blips no longer flash */
@@ -917,7 +743,7 @@ body {
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: flex-start;
     padding: 0 40px;
     gap: 30px;
 }
@@ -941,54 +767,85 @@ body {
 }
 
 /* --- MOBILE RESPONSIVENESS --- */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
+    body {
+        font-size: 12px;
+    }
+
     .menu-header {
-        padding: 0 15px;
+        padding: 0 10px;
+    }
+
+    .header-top-bar {
+        height: 45px;
     }
 
     .logo {
-        font-size: 1.8rem;
+        font-size: 1.5rem;
     }
 
     .username,
     .clock-display {
-        font-size: 0.9rem;
+        font-size: 0.8rem;
+    }
+
+    .avatar {
+        width: 30px;
+        height: 30px;
+    }
+
+    .menu-nav {
+        margin-top: 5px;
     }
 
     .nav-list {
-        gap: 15px;
+        gap: 10px;
         overflow-x: auto;
         padding-bottom: 5px;
     }
 
     .nav-item {
-        font-size: 1.1rem;
+        font-size: 0.9rem;
         white-space: nowrap;
+        padding-bottom: 8px;
     }
 
     .tab-content {
-        padding: 20px 15px;
+        padding: 15px 10px;
     }
 
     .info-grid {
         grid-template-columns: 1fr;
-        gap: 15px;
+        gap: 10px;
+    }
+
+    .info-card {
+        padding: 15px;
+    }
+
+    .info-card h3 {
+        font-size: 1rem;
+        margin-bottom: 10px;
     }
 
     .stat-value {
-        font-size: 2rem;
+        font-size: 1.5rem;
     }
 
     .weather-icon {
-        font-size: 5rem;
-    }
-
-    .temperature {
         font-size: 4rem;
     }
 
+    .temperature {
+        font-size: 3rem;
+    }
+
+    .condition {
+        font-size: 1.2rem;
+    }
+
     .forecast-row {
-        gap: 15px;
+        gap: 10px;
         overflow-x: auto;
         justify-content: flex-start;
         width: 100%;
@@ -996,18 +853,37 @@ body {
     }
 
     .forecast-item {
-        padding: 15px 25px;
+        padding: 10px 15px;
         flex-shrink: 0;
     }
 
+    .forecast-item .day {
+        font-size: 0.9rem;
+    }
+
+    .forecast-item .icon {
+        font-size: 2rem;
+    }
+
+    .forecast-item .temp {
+        font-size: 1.2rem;
+    }
+
     .settings-list {
-        gap: 15px;
+        gap: 0;
     }
 
     .setting-item {
         flex-direction: column;
         align-items: flex-start;
-        gap: 10px;
+        gap: 8px;
+        padding: 10px 15px;
+        height: auto;
+        min-height: 50px;
+    }
+
+    .setting-item label {
+        font-size: 0.9rem;
     }
 
     .gta-input,
@@ -1016,26 +892,56 @@ body {
     }
 
     .map-overlay-info {
-        bottom: 20px;
-        left: 20px;
-        right: 20px;
+        bottom: 10px;
+        left: 10px;
+        right: 10px;
     }
 
     .location-name {
-        font-size: 1.4rem;
+        font-size: 1.1rem;
     }
 
     .coordinates {
-        font-size: 0.8rem;
+        font-size: 0.7rem;
+    }
+
+    .player-legend {
+        min-width: 120px;
+        max-width: 180px;
+    }
+
+    .legend-header {
+        font-size: 0.6rem;
+        padding: 3px 8px 3px 12px;
+    }
+
+    .legend-name {
+        font-size: 0.75rem;
+    }
+
+    .legend-blip {
+        width: 16px;
+        height: 16px;
     }
 
     .menu-footer {
-        padding: 0 15px;
-        gap: 15px;
+        display: none;
     }
 
-    .key-hint {
+    .radio-station {
+        width: 40px;
+        height: 40px;
+        margin-left: -20px;
+        margin-top: -20px;
+    }
+
+    .radio-station-name {
+        font-size: 1.1rem;
+    }
+
+    .radio-toast {
         font-size: 0.8rem;
+        padding: 8px 16px;
     }
 
 }
@@ -1140,8 +1046,8 @@ body {
 
 .radio-tab-container {
     position: relative;
-    width: 950px;
-    height: 950px;
+    width: min(950px, 88vw, 82vh);
+    height: min(950px, 88vw, 82vh);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -1198,5 +1104,95 @@ body {
     text-transform: uppercase;
     text-shadow: 0 2px 5px rgba(0,0,0,0.8);
     letter-spacing: 1px;
+}
+
+.radio-toast {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: #fff;
+    padding: 10px 24px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-left: 3px solid var(--accent-color);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 100;
+    white-space: nowrap;
+}
+
+.radio-toast.visible {
+    opacity: 1;
+}
+
+/* Firefox range slider thumb */
+.gta-slider::-moz-range-thumb {
+    width: 4px;
+    height: 14px;
+    background: #fff;
+    cursor: pointer;
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+    border: none;
+    border-radius: 0;
+}
+
+.gta-slider::-moz-range-track {
+    background: #333;
+    height: 10px;
+}
+
+/* Map loading spinner */
+.map-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.15);
+    border-top: 3px solid var(--accent-color);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    z-index: 900;
+    pointer-events: none;
+}
+
+@keyframes spin {
+    to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* Reduce Motion */
+body.reduce-motion * {
+    animation: none !important;
+    transition: none !important;
+}
+
+body.reduce-motion *::before,
+body.reduce-motion *::after {
+    animation: none !important;
+    transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+/* Mobile settings scroll fix */
+@media (max-width: 768px) {
+    .settings-list {
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
 }
 

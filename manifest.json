@@ -1,0 +1,22 @@
+{
+    "name": "GTA V Pause Menu",
+    "short_name": "Pause Menu",
+    "description": "GTA V Real-Life Pause Menu Recreation",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#000000",
+    "theme_color": "#000000",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "Blips/Player.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "Blips/Player.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

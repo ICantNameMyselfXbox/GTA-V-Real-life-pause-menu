@@ -37,9 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     let currentRadioIndex = 0;
-    const RADIO_START_EPOCH = 1711756800000;
     const stationWidgets = {};
-    const stationDurations = {};
     const directAudioPlayers = {}; // For non-SoundCloud links
 
     // --- Radio Progress Persistence ---
@@ -84,10 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             widget.bind(SC.Widget.Events.READY, () => {
                 widget.setVolume(0);
-                widget.getDuration((duration) => {
-                    stationDurations[index] = duration;
-                    widget.play();
-                });
+                widget.play();
             });
         } else if (!isSoundCloud) {
             // --- Local / Direct Audio Setup ---
@@ -126,15 +121,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         wheel.innerHTML = '';
         const total = radioStations.length;
-        const radius = 400; // Increased distance from center to prevent stations from touching
 
         radioStations.forEach((station, index) => {
-            // Calculate angle: start at top (-90 deg)
             const angle = (index / total) * (Math.PI * 2) - (Math.PI / 2);
-
-            // Container center is 50%, 50%. We use percentages for absolute positioning.
-            const x = 50 + (Math.cos(angle) * (radius / 475) * 50); // 475 is half of 950px container width
-            const y = 50 + (Math.sin(angle) * (radius / 475) * 50);
+            const x = 50 + (Math.cos(angle) * 0.92 * 50);
+            const y = 50 + (Math.sin(angle) * 0.92 * 50);
 
             const el = document.createElement('div');
             el.className = 'radio-station';
@@ -158,48 +149,46 @@ document.addEventListener('DOMContentLoaded', () => {
                     el.style.backgroundImage = `url('${station.icon}')`;
                 }
             } else {
-                // Radio Off placeholder
-                el.innerHTML = '<div style="width:100%;height:100%;display:flex;justify-content:center;align-items:center;font-size:32px;border:3px solid #ccc;border-radius:50%;color:#ccc;">🚫</div>';
+                el.innerHTML = '<div style="width:100%;height:100%;display:flex;justify-content:center;align-items:center;font-size:24px;border:3px solid #ccc;border-radius:50%;color:#ccc;">🚫</div>';
             }
 
             if (index === currentRadioIndex) el.classList.add('active');
 
-            // Hover event: update central text
             el.addEventListener('mouseenter', () => {
                 infoName.innerText = station.name;
                 sounds.changeOption.currentTime = 0;
                 sounds.changeOption.play().catch(() => { });
             });
 
-            // Click event: select station
+            el.addEventListener('touchstart', () => {
+                infoName.innerText = station.name;
+            }, { passive: true });
+
             el.addEventListener('click', () => {
                 document.querySelectorAll('.radio-station').forEach(s => s.classList.remove('active'));
                 el.classList.add('active');
                 currentRadioIndex = index;
 
-                // Stop All Audio Sources
                 Object.values(stationWidgets).forEach(w => w.setVolume(0));
                 Object.values(directAudioPlayers).forEach(a => {
                     a.pause();
-                    // a.currentTime = 0; // Removed per user request to save progress! >w<
                 });
                 sounds.music.pause();
                 
-                if (index === 0 || !station.soundcloudUrl) {
-                    // Radio Off or Placeholder -> Play Background Music
+                if (index === 0) {
                     sounds.music.play().catch(() => { });
                     console.log("Playing background ambiance...");
+                } else if (!station.soundcloudUrl) {
+                    showRadioToast('NO STREAM AVAILABLE');
                 } else {
                     const radioVolSlider = document.getElementById('radio-volume-slider');
                     const targetVolume = radioVolSlider ? (radioVolSlider.value / 100) : 0.5;
 
                     if (stationWidgets[index]) {
-                        // Play SoundCloud
                         const widget = stationWidgets[index];
                         widget.setVolume(targetVolume * 100);
                         console.log(`Streaming SoundCloud: ${station.name}`);
                     } else if (directAudioPlayers[index]) {
-                        // Play Direct Stream
                         const player = directAudioPlayers[index];
                         player.volume = targetVolume;
                         player.play().catch(e => console.error("Streaming failed:", e));
@@ -211,24 +200,67 @@ document.addEventListener('DOMContentLoaded', () => {
             wheel.appendChild(el);
         });
 
-        // Reset info name on mouse leave wheel
         document.getElementById('radio').addEventListener('mouseleave', () => {
             infoName.innerText = radioStations[currentRadioIndex].name;
         });
+
+        layoutRadioWheel();
+    }
+
+    function layoutRadioWheel() {
+        const wheel = document.getElementById('radio-wheel');
+        if (!wheel) return;
+        const container = wheel.parentElement;
+        if (!container || container.offsetWidth === 0) return;
+
+        const cw = container.offsetWidth;
+        const ch = container.offsetHeight;
+        const size = Math.min(cw, ch);
+        const total = radioStations.length;
+        const stationEls = wheel.querySelectorAll('.radio-station');
+        if (!stationEls.length) return;
+
+        const isSmall = size < 500;
+        const stationSize = isSmall ? Math.max(28, size / (total * 0.3)) : 88;
+        const stationMargin = stationSize / 2;
+        const radius = (size / 2) - stationMargin - (isSmall ? 4 : 8);
+        const radiusPct = (radius / (size / 2)) * 50;
+
+        stationEls.forEach((el, index) => {
+            const angle = (index / total) * (Math.PI * 2) - (Math.PI / 2);
+            const x = 50 + Math.cos(angle) * radiusPct;
+            const y = 50 + Math.sin(angle) * radiusPct;
+            el.style.left = `${x}%`;
+            el.style.top = `${y}%`;
+            el.style.width = `${stationSize}px`;
+            el.style.height = `${stationSize}px`;
+            el.style.marginLeft = `-${stationMargin}px`;
+            el.style.marginTop = `-${stationMargin}px`;
+            el.style.zIndex = index === currentRadioIndex ? 10 : 1;
+        });
+
+        const active = wheel.querySelector('.radio-station.active');
+        if (active) active.style.zIndex = 10;
     }
 
     initRadioWheel();
 
+    window.addEventListener('resize', debounce(layoutRadioWheel, 200));
+
     // --- Tab Navigation ---
     const navItems = document.querySelectorAll('.nav-item');
     const tabContents = document.querySelectorAll('.tab-content');
+    let previousTab = 'map';
 
     function switchTab(tabName) {
-        // Play sound
         sounds.switchTab.currentTime = 0;
         sounds.switchTab.play().catch(() => { });
 
-        // Update Nav
+        const prevActive = document.querySelector('.nav-item.active');
+        if (prevActive && prevActive.dataset.tab !== tabName) {
+            previousTab = prevActive.dataset.tab;
+        }
+
         navItems.forEach(item => {
             if (item.dataset.tab === tabName) {
                 item.classList.add('active');
@@ -241,9 +273,11 @@ document.addEventListener('DOMContentLoaded', () => {
         tabContents.forEach(content => {
             if (content.id === tabName) {
                 content.classList.add('active');
-                // Trigger map resize if map tab
                 if (tabName === 'map' && map) {
                     setTimeout(() => map.resize(), 100);
+                }
+                if (tabName === 'radio') {
+                    setTimeout(layoutRadioWheel, 50);
                 }
             } else {
                 content.classList.remove('active');
@@ -290,6 +324,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     map.on('load', () => {
+        const spinner = document.getElementById('map-spinner');
+        if (spinner) spinner.style.display = 'none';
         startFlightRadar();
         initStaticMapLayers();
         initStaticBlips();
@@ -308,9 +344,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
-
-    // Add navigation controls (optional, keep minimal for GTA style)
-    // map.addControl(new maplibregl.NavigationControl(), 'top-right');
 
     // Fetch User Location
     let multiplayerInitialized = false;
@@ -428,8 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Network Awareness (Mobile Data / WiFi switching) ---
     window.addEventListener('online', () => {
         console.log("+++ Network back ONLINE. Reconnecting multiplayer... +++");
-        const statusEl = document.querySelector('.connection-status');
-        if (statusEl) statusEl.innerText = "NETWORK RESTORED - RECONNECTING...";
+        if (cachedStatusEl) cachedStatusEl.innerText = "NETWORK RESTORED - RECONNECTING...";
 
         // Reset flags to allow fresh init
         isMultiplayerTransitioning = false;
@@ -444,8 +476,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.addEventListener('offline', () => {
         console.log("--- Network OFFLINE. Connections paused. ---");
-        const statusEl = document.querySelector('.connection-status');
-        if (statusEl) statusEl.innerText = "OFFLINE - CHECK CONNECTION";
+        if (cachedStatusEl) cachedStatusEl.innerText = "OFFLINE - CHECK CONNECTION";
 
         if (currentPeer) {
             currentPeer.destroy();
@@ -491,6 +522,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const pfpInput = document.getElementById('pfp-input');
     const colorInput = document.getElementById('color-input');
     const sliders = document.querySelectorAll('.gta-slider');
+    let volSlider = null;
 
     function saveSettings() {
         const flightToggle = document.getElementById('flight-radar-toggle-btn');
@@ -505,11 +537,11 @@ document.addEventListener('DOMContentLoaded', () => {
             avatar: document.querySelector('.avatar').src,
             volume: volSlider ? volSlider.value : 80,
             flightRadar: flightToggle ? flightToggle.innerText.includes('On') : true,
-
             blipScale: blipSlider ? blipSlider.value : 1.0,
             showLegend: legendToggle ? legendToggle.innerText.includes('On') : true,
             showOverlay: overlayToggle ? overlayToggle.innerText.includes('On') : true,
-            radioVolume: document.getElementById('radio-volume-slider')?.value || 50
+            radioVolume: document.getElementById('radio-volume-slider')?.value || 50,
+            reduceMotion: document.getElementById('reduce-motion-toggle')?.innerText.includes('On') || false
         };
         localStorage.setItem('gta_pause_settings', JSON.stringify(settings));
     }
@@ -529,7 +561,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Name
             if (usernameInput) {
                 usernameInput.value = settings.username || 'PlayerOne';
-                document.querySelector('.username').innerText = usernameInput.value;
+                if (cachedUsernameEl) cachedUsernameEl.innerText = usernameInput.value;
             }
 
             // Color
@@ -591,7 +623,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 radioVolSlider.value = settings.radioVolume;
                 updateSliderVisuals(radioVolSlider);
             }
+
+            // Reduce Motion
+            const reduceMotionToggle = document.getElementById('reduce-motion-toggle');
+            if (reduceMotionToggle && settings.hasOwnProperty('reduceMotion')) {
+                reduceMotionToggle.innerText = settings.reduceMotion ? '< On >' : '< Off >';
+                applyReduceMotion(settings.reduceMotion);
+            }
         }
+
     }
 
     // --- SESSION PERSISTENCE (Fixes Ghost Blips) ---
@@ -642,9 +682,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- FLIGHT RADAR LOGIC (GLOBAL) ---
-    let flightCooldown = 60000; // Start at 60s between fetches
+    let flightCooldown = 60000;
     let flightFetchTimer = null;
-    let allAircraftData = null; // Global aircraft cache from adsb.lol /v2/all
+    let allAircraftData = null;
+    let radarAnimFrame = null;
+    let radarLastFrameTime = 0;
+    let radarEnabled = true;
 
     function scheduleNextFlightFetch(delay) {
         if (flightFetchTimer) clearTimeout(flightFetchTimer);
@@ -658,22 +701,23 @@ document.addEventListener('DOMContentLoaded', () => {
         radarServiceInitialised = true;
 
         console.log("+++ Flight Radar Service starting (10s cooldown) +++");
-        fetchFlights(); // Initial fetch
+        fetchFlights();
 
-        // Physics Engine Loop (every 50ms for smooth 20fps updates)
-        setInterval(() => {
-            const toggle = document.getElementById('flight-radar-toggle');
-            if (toggle && !toggle.innerText.includes('On')) {
-                // If disabled, ensure cleared
-                if (allAircraftData && allAircraftData.length > 0) {
-                    allAircraftData = [];
-                    clearFlightBlips();
-                }
-                return;
+        radarLastFrameTime = performance.now();
+        function radarLoop(now) {
+            radarAnimFrame = requestAnimationFrame(radarLoop);
+            if (document.hidden) return;
+            if (!radarEnabled) return;
+            const toggle = document.getElementById('flight-radar-toggle-btn');
+            if (toggle && !toggle.innerText.includes('On')) return;
+            const deltaT = (now - radarLastFrameTime) / 1000;
+            radarLastFrameTime = now;
+            if (deltaT > 0 && deltaT < 1) {
+                simulateAircraftMovement(deltaT);
+                applyViewportFilter();
             }
-            simulateAircraftMovement();
-            applyViewportFilter(); // Re-render markers at new positions
-        }, 50);
+        }
+        radarAnimFrame = requestAnimationFrame(radarLoop);
 
         // Map move: re-fetch if center moved significantly
         let lastFetchCenter = null;
@@ -706,7 +750,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             map.addSource('airports', {
                 type: 'geojson',
-                data: 'https://raw.githubusercontent.com/grafana/grafana/main/public/gazetteer/airports.geojson'
+                data: 'airports.geojson'
             });
 
             map.addLayer({
@@ -760,25 +804,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Physics Engine: Update ALL aircraft positions (global state), not just markers
-    function simulateAircraftMovement() {
+    // Physics Engine: interpolate aircraft positions from base data
+    function simulateAircraftMovement(deltaT) {
         if (!allAircraftData || allAircraftData.length === 0) return;
 
-        const deltaT = 0.05; // 50ms = 0.05s
-        const degM = 111111; // Approx meters per degree
+        const degM = 111111;
+        const now = performance.now();
 
         allAircraftData.forEach(ac => {
+            if (!ac._baseLat) return;
             if (ac.gs && ac.gs > 0 && ac.track !== undefined) {
-                // ac.gs is in Knots. 1 Knot = 0.514444 m/s
+                const elapsed = (now - ac._baseTime) / 1000;
                 const speedMs = ac.gs * 0.514444;
-
                 const rad = (ac.track - 90) * (Math.PI / 180);
-                const dx = Math.cos(rad) * speedMs * deltaT;
-                const dy = -Math.sin(rad) * speedMs * deltaT;
-
-                ac.lat += dy / degM;
-                // adjustments for longitude at latitude
-                ac.lon += dx / (degM * Math.cos(ac.lat * Math.PI / 180));
+                const dx = Math.cos(rad) * speedMs * elapsed;
+                const dy = -Math.sin(rad) * speedMs * elapsed;
+                ac.lat = ac._baseLat + dy / degM;
+                ac.lon = ac._baseLon + dx / (degM * Math.cos(ac._baseLat * Math.PI / 180));
+            } else {
+                ac.lat = ac._baseLat;
+                ac.lon = ac._baseLon;
             }
         });
     }
@@ -820,8 +865,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data && Array.isArray(data.ac)) {
                 console.log(`[RADAR] ✈ Found ${data.ac.length} aircraft near map center.`);
-                flightCooldown = 10000; // Fetch every 10s (was 60s) for "real-time" feel
-                allAircraftData = data.ac; // cache for viewport filtering & pan re-use
+                flightCooldown = 10000;
+                const now = performance.now();
+                data.ac.forEach(ac => {
+                    ac._baseLat = ac.lat;
+                    ac._baseLon = ac.lon;
+                    ac._baseTime = now;
+                });
+                allAircraftData = data.ac;
                 applyViewportFilter();
             } else {
                 console.log('[RADAR] No aircraft data in response.');
@@ -950,8 +1001,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentLobbyIndex = 0;
 
     function initMultiplayer(lat, lng) {
-        const statusEl = document.querySelector('.connection-status');
-        const peerIdEl = document.getElementById('debug-peer-id');
+        const statusEl = cachedStatusEl;
+        const peerIdEl = cachedPeerIdEl;
 
         if (isMultiplayerTransitioning) {
             if (statusEl && !statusEl.innerText.includes('SWITCHING')) {
@@ -1140,7 +1191,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         sessionId: mySessionId,
                         lat: userPos.lat,
                         lng: userPos.lng,
-                        name: document.querySelector('.username').innerText
+                        name: cachedUsernameEl?.innerText || 'PlayerOne'
                     };
 
                     // Add all other connected players
@@ -1190,8 +1241,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log('Hub ID ghosted! Trying next fallback lobby... >w<');
                     hubPeer.destroy();
                     currentLobbyIndex = (currentLobbyIndex + 1) % LOBBY_IDS.length;
-                    const statusEl = document.querySelector('.connection-status');
-                    if (statusEl) statusEl.innerText = `SWITCHING TO LOBBY ${currentLobbyIndex + 1}...`;
+                    if (cachedStatusEl) cachedStatusEl.innerText = `SWITCHING TO LOBBY ${currentLobbyIndex + 1}...`;
                     setTimeout(() => initMultiplayer(userPos.lat, userPos.lng), 2000);
                 } else {
                     console.error("Hub Error:", err);
@@ -1214,7 +1264,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         sessionId: mySessionId,
                         lat: userPos.lat,
                         lng: userPos.lng,
-                        name: document.querySelector('.username').innerText
+                        name: cachedUsernameEl?.innerText || 'PlayerOne'
                     });
                 }
             };
@@ -1242,12 +1292,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Don't draw blips at 0,0
         if (Math.abs(data.lat) < 0.0001 && Math.abs(data.lng) < 0.0001) return;
-
-        // Proximity Guard: Removed to allow local testing to work!
-        // Local testing on the same IP / coords used to fail here.
-        // const latDiff = Math.abs(data.lat - (userPos.lat || 0));
-        // const lngDiff = Math.abs(data.lng - (userPos.lng || 0));
-        // if (latDiff < 0.0001 && lngDiff < 0.0001) return;
 
         if (otherPlayers[id]) {
             otherPlayers[id].marker.setLngLat([data.lng, data.lat]);
@@ -1336,35 +1380,63 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 5000);
 
     // --- PLAYER LEGEND ---
+    const cachedUsernameEl = document.querySelector('.username');
+    const cachedStatusEl = document.querySelector('.connection-status');
+    const cachedPeerIdEl = document.getElementById('debug-peer-id');
+    const cachedLegendList = document.getElementById('legend-list');
+
     function updateLegend() {
-        const legendList = document.getElementById('legend-list');
+        const legendList = cachedLegendList || document.getElementById('legend-list');
         if (!legendList) return;
 
-        legendList.innerHTML = '';
+        const selfName = cachedUsernameEl?.innerText || 'YOU';
+        const playerIds = Object.keys(otherPlayers);
+        const existingEntries = legendList.querySelectorAll('.legend-entry');
+        const existingIds = [];
 
-        // Self entry — clickable, centers map on YOU
-        const selfName = document.querySelector('.username')?.innerText || 'YOU';
-        const selfEntry = document.createElement('div');
-        selfEntry.className = 'legend-entry clickable';
-        selfEntry.title = `Center on YOU`;
-        selfEntry.innerHTML = `
-            <span class="legend-name self">${selfName}</span>
-            <div class="legend-blip self"></div>
-        `;
-        selfEntry.addEventListener('click', () => {
-            if (userPos.lat && userPos.lng) {
-                followTarget = 'self';
-                map.flyTo({ center: [userPos.lng, userPos.lat], zoom: Math.max(map.getZoom(), 15), essential: true });
-                console.log("Following YOU");
-            }
+        existingEntries.forEach((entry, i) => {
+            if (i === 0) return;
+            existingIds.push(entry.dataset.playerId);
         });
-        legendList.appendChild(selfEntry);
 
-        // Other players — clickable, fly to their position & follow
-        for (let id in otherPlayers) {
-            const p = otherPlayers[id];
+        const neededIds = playerIds;
+
+        const removedIds = existingIds.filter(id => !neededIds.includes(id));
+        const addedIds = neededIds.filter(id => !existingIds.includes(id));
+        const keptIds = neededIds.filter(id => existingIds.includes(id));
+
+        removedIds.forEach(id => {
+            const entry = legendList.querySelector(`[data-player-id="${id}"]`);
+            if (entry) entry.remove();
+        });
+
+        const selfEntry = existingEntries[0];
+        if (selfEntry) {
+            const nameSpan = selfEntry.querySelector('.legend-name');
+            if (nameSpan) nameSpan.textContent = selfName;
+        } else {
             const entry = document.createElement('div');
             entry.className = 'legend-entry clickable';
+            entry.title = 'Center on YOU';
+            entry.innerHTML = `
+                <span class="legend-name self">${selfName}</span>
+                <div class="legend-blip self"></div>
+            `;
+            entry.addEventListener('click', () => {
+                if (userPos.lat && userPos.lng) {
+                    followTarget = 'self';
+                    map.flyTo({ center: [userPos.lng, userPos.lat], zoom: Math.max(map.getZoom(), 15), essential: true });
+                }
+            });
+            legendList.appendChild(entry);
+        }
+
+        addedIds.forEach(id => {
+            const p = otherPlayers[id];
+            if (!p) return;
+            const entry = document.createElement('div');
+            entry.className = 'legend-entry clickable';
+            entry.dataset.playerId = id;
             entry.title = `Center & Follow ${p.name || 'Player'}`;
             entry.innerHTML = `
                 <span class="legend-name">${p.name || 'Unknown'}</span>
@@ -1374,20 +1446,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (p.lat && p.lng) {
                     followTarget = id;
                     map.flyTo({ center: [p.lng, p.lat], zoom: Math.max(map.getZoom(), 15), essential: true });
-                    console.log(`Following ${p.name}`);
                 }
             });
             legendList.appendChild(entry);
-        }
+        });
+
+        keptIds.forEach(id => {
+            const p = otherPlayers[id];
+            const entry = legendList.querySelector(`[data-player-id="${id}"]`);
+            if (entry && p) {
+                const nameSpan = entry.querySelector('.legend-name');
+                if (nameSpan) nameSpan.textContent = p.name || 'Unknown';
+            }
+        });
     }
 
     // Initial legend render (just self)
     updateLegend();
-
-    // Stop following on map drag
-    map.on('dragstart', () => {
-        followTarget = null;
-    });
 
 
     // Weather API (Open-Meteo)
@@ -1495,7 +1570,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (usernameInput) {
         usernameInput.addEventListener('input', (e) => {
-            document.querySelector('.username').innerText = e.target.value || 'PlayerOne';
+            if (cachedUsernameEl) cachedUsernameEl.innerText = e.target.value || 'PlayerOne';
             updateLegend();
             saveSettings();
         });
@@ -1518,36 +1593,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     saveSettings();
                 };
                 reader.readAsDataURL(file);
-            }
-        });
-    }
-
-    const flightToggle = document.getElementById('flight-radar-toggle');
-    if (flightToggle) {
-        flightToggle.addEventListener('click', () => {
-            const isOn = flightToggle.innerText.includes('On');
-            flightToggle.innerText = isOn ? '< Off >' : '< On >';
-            saveSettings();
-
-            if (isOn) { // Was On, now Off
-                clearFlightBlips();
-            } else {
-                fetchFlights();
-            }
-        });
-    }
-
-    const storesToggle = document.getElementById('stores-toggle');
-    if (storesToggle) {
-        storesToggle.addEventListener('click', () => {
-            const isOn = storesToggle.innerText.includes('On');
-            storesToggle.innerText = isOn ? '< Off >' : '< On >';
-            saveSettings();
-
-            if (isOn) {
-                clearStoreBlips();
-            } else {
-                fetchStores();
             }
         });
     }
@@ -1583,21 +1628,34 @@ document.addEventListener('DOMContentLoaded', () => {
             const isOn = flightRadarToggle.innerText.includes('On');
             flightRadarToggle.innerText = isOn ? '< Off >' : '< On >';
 
-            // Toggle Airport Layer Visibility
             if (map && map.getLayer('airports-layer')) {
                 map.setLayoutProperty('airports-layer', 'visibility', isOn ? 'none' : 'visible');
             }
 
+            radarEnabled = !isOn;
+
             saveSettings();
 
             if (isOn) {
-                // Turned OFF
                 allAircraftData = [];
                 clearFlightBlips();
             } else {
-                // Turned ON
                 fetchFlights();
             }
+        });
+    }
+
+    // Reduce Motion toggle
+    const reduceMotionToggle = document.getElementById('reduce-motion-toggle');
+    function applyReduceMotion(enabled) {
+        document.body.classList.toggle('reduce-motion', enabled);
+    }
+    if (reduceMotionToggle) {
+        reduceMotionToggle.addEventListener('click', () => {
+            const isOn = reduceMotionToggle.innerText.includes('On');
+            reduceMotionToggle.innerText = isOn ? '< Off >' : '< On >';
+            applyReduceMotion(!isOn);
+            saveSettings();
         });
     }
 
@@ -1636,11 +1694,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     map.setLayoutProperty('airports-layer', 'icon-size', 0.7 * scale);
                 }
             } else if (slider.id === 'volume-slider') {
-                // Update Global Volume (if applicable)
                 if (sounds) {
+                    const vol = slider.value / 100;
                     Object.values(sounds).forEach(sound => {
-                        sound.volume = slider.value / 100;
+                        sound.volume = vol;
                     });
+                    sounds.music.volume = vol * 0.6;
                 }
                 Object.keys(stationWidgets).forEach(key => {
                     if (parseInt(key) === currentRadioIndex) {
@@ -1674,4 +1733,43 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     });
+
+    // --- Keyboard Navigation ---
+    document.addEventListener('keydown', (e) => {
+        const activeTab = document.querySelector('.nav-item.active');
+        const tabNames = Array.from(navItems).map(i => i.dataset.tab);
+        const currentIndex = tabNames.indexOf(activeTab?.dataset.tab);
+
+        if (e.key === 'ArrowRight') {
+            const next = (currentIndex + 1) % tabNames.length;
+            switchTab(tabNames[next]);
+            sounds.changeOption.currentTime = 0;
+            sounds.changeOption.play().catch(() => { });
+        } else if (e.key === 'ArrowLeft') {
+            const prev = (currentIndex - 1 + tabNames.length) % tabNames.length;
+            switchTab(tabNames[prev]);
+            sounds.changeOption.currentTime = 0;
+            sounds.changeOption.play().catch(() => { });
+        } else if (e.key === 'Escape') {
+            sounds.back.currentTime = 0;
+            sounds.back.play().catch(() => { });
+            switchTab(previousTab || 'map');
+        } else if (e.key === 'Enter') {
+            const radioTab = document.getElementById('radio');
+            if (radioTab.classList.contains('active')) {
+                const stations = document.querySelectorAll('.radio-station');
+                if (stations[currentRadioIndex]) stations[currentRadioIndex].click();
+            }
+        }
+    });
+
+    // --- Radio Toast ---
+    function showRadioToast(msg) {
+        let toast = document.getElementById('radio-toast');
+        if (!toast) return;
+        toast.textContent = msg;
+        toast.classList.add('visible');
+        clearTimeout(toast._timer);
+        toast._timer = setTimeout(() => toast.classList.remove('visible'), 2000);
+    }
 });
