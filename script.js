@@ -991,21 +991,17 @@ document.addEventListener('DOMContentLoaded', () => {
         flightMarkers = {};
     }
 
-    // Lobby tracking fallback system
-    const LOBBY_IDS = [
-        'GTA-V-UNIVERSAL-LOBBY-M4K0-ALPHA',
-        'GTA-V-UNIVERSAL-LOBBY-M4K0-BETA',
-        'GTA-V-UNIVERSAL-LOBBY-M4K0-GAMMA',
-        'GTA-V-UNIVERSAL-LOBBY-M4K0-DELTA'
-    ];
-    let currentLobbyIndex = 0;
+    // Universal Global Lobby ID
+    const LOBBY_ID = 'GTA-V-UNIVERSAL-LOBBY-M4K0';
+    let retryCount = 0;
+    const MAX_RETRIES = 5;
 
     function initMultiplayer(lat, lng) {
         const statusEl = cachedStatusEl;
         const peerIdEl = cachedPeerIdEl;
 
         if (isMultiplayerTransitioning) {
-            if (statusEl && !statusEl.innerText.includes('SWITCHING')) {
+            if (statusEl && !statusEl.innerText.includes('RETRY')) {
                 statusEl.innerText = "FINDING SESSION...";
             }
             return;
@@ -1021,10 +1017,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         otherPlayers = {};
 
-        // Universal Global Lobby ID - Everyone connects here
-        const hubId = LOBBY_IDS[currentLobbyIndex];
+        const hubId = LOBBY_ID;
 
-        if (statusEl && !statusEl.innerText.includes('SWITCHING')) {
+        if (statusEl && !statusEl.innerText.includes('RETRY')) {
             statusEl.innerText = "FINDING SESSION...";
         }
 
@@ -1060,9 +1055,10 @@ document.addEventListener('DOMContentLoaded', () => {
         currentPeer = peer;
 
         peer.on('open', (myId) => {
+            retryCount = 0;
             isMultiplayerTransitioning = false;
             console.log('My Peer ID:', myId);
-            myPeerId = myId; // Save globally
+            myPeerId = myId;
             if (peerIdEl) peerIdEl.innerText = myId;
             if (statusEl) statusEl.innerText = "JOINING GLOBAL LOBBY...";
             attemptConnect(hubId, myId, peer);
@@ -1072,7 +1068,7 @@ document.addEventListener('DOMContentLoaded', () => {
             isMultiplayerTransitioning = false;
             console.error('Peer Primary Error:', err.type, err);
             if (err.type === 'peer-unavailable') {
-                // Lobby peer is likely dead or transition in progress
+                retryCount = 0;
                 becomeHub();
             } else if (err.type === 'network' || err.type === 'server-error') {
                 if (statusEl) statusEl.innerText = "RECONNECTING...";
@@ -1165,10 +1161,11 @@ document.addEventListener('DOMContentLoaded', () => {
             currentPeer = hubPeer;
 
             hubPeer.on('open', () => {
+                retryCount = 0;
                 isMultiplayerTransitioning = false;
                 if (statusEl) statusEl.innerText = "LOBBY ACTIVE (RELAY)";
                 console.log('+++ GLOBAL LOBBY RELAY ACTIVE +++');
-                myPeerId = hubId; // CRITICAL
+                myPeerId = hubId;
 
                 // Clear old state when becoming hub
                 for (let id in otherPlayers) {
@@ -1238,11 +1235,18 @@ document.addEventListener('DOMContentLoaded', () => {
             hubPeer.on('error', (err) => {
                 isMultiplayerTransitioning = false;
                 if (err.type === 'unavailable-id') {
-                    console.log('Hub ID ghosted! Trying next fallback lobby... >w<');
+                    console.log('Hub ID ghosted! Retrying in 5s...');
                     hubPeer.destroy();
-                    currentLobbyIndex = (currentLobbyIndex + 1) % LOBBY_IDS.length;
-                    if (cachedStatusEl) cachedStatusEl.innerText = `SWITCHING TO LOBBY ${currentLobbyIndex + 1}...`;
-                    setTimeout(() => initMultiplayer(userPos.lat, userPos.lng), 2000);
+                    retryCount++;
+                    if (retryCount >= MAX_RETRIES) {
+                        console.error('Max retries reached. Waiting 30s before reset.');
+                        if (statusEl) statusEl.innerText = "LOBBY BUSY - RETRYING...";
+                        retryCount = 0;
+                        setTimeout(() => initMultiplayer(userPos.lat, userPos.lng), 30000);
+                    } else {
+                        if (statusEl) statusEl.innerText = `RETRY ${retryCount}/${MAX_RETRIES}...`;
+                        setTimeout(() => initMultiplayer(userPos.lat, userPos.lng), 5000);
+                    }
                 } else {
                     console.error("Hub Error:", err);
                     if (statusEl) statusEl.innerText = "CONNECTION ERROR";

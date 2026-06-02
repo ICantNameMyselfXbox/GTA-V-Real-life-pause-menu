@@ -393,8 +393,8 @@ body {
 
 .player-blip,
 .other-blip {
-    width: 0;
-    height: 0;
+    width: var(--current-blip-size);
+    height: var(--current-blip-size);
     position: relative;
     cursor: pointer;
     pointer-events: auto;
@@ -402,6 +402,7 @@ body {
     padding: 0;
     display: block;
     user-select: none;
+    overflow: visible;
 }
 
 .player-blip {
@@ -417,8 +418,8 @@ body {
     width: var(--current-blip-size);
     height: var(--current-blip-size);
     position: absolute;
-    top: calc(var(--current-blip-size) / -2);
-    left: calc(var(--current-blip-size) / -2);
+    top: 0;
+    left: 0;
     background-size: contain;
     background-position: center;
     background-repeat: no-repeat;
@@ -439,23 +440,34 @@ body {
 /* GTA Online Style Name Tags */
 .blip-name-tag {
     position: absolute;
-    left: 20px;
-    /* Offset from the 0,0 center */
+    right: 100%;
     top: 50%;
     transform: translateY(-50%);
-    background: rgba(0, 0, 0, 0.9);
+    margin-right: 8px;
+    background: rgba(0, 0, 0, 0.85);
     color: white;
-    padding: 4px 10px;
+    padding: 3px 8px;
     font-family: 'Oswald', sans-serif;
-    font-size: 0.9rem;
+    font-size: 0.75rem;
+    font-weight: 500;
     text-transform: uppercase;
     white-space: nowrap;
     border-radius: 2px;
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.15s ease;
-    border-left: 3px solid var(--accent-color);
     z-index: 1000;
+    letter-spacing: 0.5px;
+}
+
+.blip-name-tag::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: -7px;
+    transform: translateY(-50%);
+    border: 4px solid transparent;
+    border-left-color: rgba(0, 0, 0, 0.85);
 }
 
 .other-blip:hover .blip-name-tag,
@@ -465,10 +477,6 @@ body {
 .player-blip:active .blip-name-tag,
 .player-blip.show-name .blip-name-tag {
     opacity: 1;
-}
-
-.player-blip .blip-name-tag {
-    border-left: 3px solid #fff;
 }
 
 .location-name {
