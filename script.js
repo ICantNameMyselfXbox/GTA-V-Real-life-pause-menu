@@ -368,23 +368,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 icon.className = 'blip-icon';
                 playerMarkerEl.appendChild(icon);
 
-                // Create Name Tag for self
-                const nameTag = document.createElement('span');
-                nameTag.className = 'blip-name-tag';
-                nameTag.innerText = 'YOU';
-                playerMarkerEl.appendChild(nameTag);
-
-                // --- MOBILE TOUCH SUPPORT (Personal Blip) ---
-                playerMarkerEl.addEventListener('click', (e) => {
-                    e.preventDefault(); // Stop map drag
-                    playerMarkerEl.classList.add('show-name');
-                    if (playerMarkerEl.hideTimer) clearTimeout(playerMarkerEl.hideTimer);
-                    playerMarkerEl.hideTimer = setTimeout(() => {
-                        playerMarkerEl.classList.remove('show-name');
-                    }, 3000);
-                    e.stopPropagation();
-                });
-
                 playerMarker = new maplibregl.Marker({
                     element: playerMarkerEl,
                     anchor: 'center',
@@ -507,6 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentPeer = null;
     let myPeerId = null; // Store local ID to avoid self-blips
     let connections = []; // Track connections if we are the hub
+    let hubConnection = null; // Connection to the hub (if we are a client)
     let flightMarkers = {};
     let userPos = { lat: 0, lng: 0 }; // Global tracking
     let followTarget = null; // null, 'self', or sessionId
@@ -1097,6 +1081,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 clearTimeout(connectionTimeout);
                 console.log('Connected to Global Lobby Relay');
                 if (statusEl) statusEl.innerText = "LOBBY ACTIVE";
+                hubConnection = conn;
                 startHeartbeat(conn, myId);
 
                 // Receive World State from the Hub
@@ -1213,6 +1198,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     conn.on('data', (data) => {
                         if (data.type === 'POS_UPDATE') {
                             updateOtherPlayer(data);
+                        } else if (data.type === 'MISSION_UPDATE') {
+                            connections.forEach(c => {
+                                if (c !== conn && c.open) c.send(data);
+                            });
+                            handleMissionUpdate(data);
                         }
                     });
 
@@ -1283,6 +1273,7 @@ document.addEventListener('DOMContentLoaded', () => {
         peer.on('connection', (conn) => {
             conn.on('data', (data) => {
                 if (data.type === 'POS_UPDATE') updateOtherPlayer(data);
+                else if (data.type === 'MISSION_UPDATE') handleMissionUpdate(data);
             });
         });
     }
@@ -1310,10 +1301,6 @@ document.addEventListener('DOMContentLoaded', () => {
             otherPlayers[id].name = data.name || "Unknown Player";
             otherPlayers[id].sessionId = data.sessionId;
             otherPlayers[id].lastUpdate = Date.now();
-
-            // Update Name Tag text
-            const nameTag = otherPlayers[id].marker.getElement().querySelector('.blip-name-tag');
-            if (nameTag) nameTag.innerText = otherPlayers[id].name;
         } else {
             console.log('New player detected (Session ID):', id);
             const el = document.createElement('div');
@@ -1323,30 +1310,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const icon = document.createElement('div');
             icon.className = 'blip-icon';
             el.appendChild(icon);
-
-            // Create Name Tag
-            const nameTag = document.createElement('span');
-            nameTag.className = 'blip-name-tag';
-            nameTag.innerText = data.name || "Unknown Player";
-            el.appendChild(nameTag);
-
-            // --- MOBILE TOUCH SUPPORT ---
-            el.addEventListener('click', (e) => {
-                e.preventDefault(); // Stop map drag
-                // Toggle show-name class
-                el.classList.add('show-name');
-
-                // Clear any existing timer
-                if (el.hideTimer) clearTimeout(el.hideTimer);
-
-                // Auto-hide after 3 seconds
-                el.hideTimer = setTimeout(() => {
-                    el.classList.remove('show-name');
-                }, 3000);
-
-                // Prevent map click events
-                e.stopPropagation();
-            });
 
             const marker = new maplibregl.Marker({
                 element: el,
@@ -1775,5 +1738,326 @@ document.addEventListener('DOMContentLoaded', () => {
         toast.classList.add('visible');
         clearTimeout(toast._timer);
         toast._timer = setTimeout(() => toast.classList.remove('visible'), 2000);
+    }
+
+    // --- GPS Navigation System ---
+    let personalWaypoint = null;
+    let missionMarker = null;
+    let personalWaypointMarker = null;
+    let missionMarkerEl = null;
+    let personalRouteSource = null;
+    let missionRouteSource = null;
+    let personalRouteLayer = null;
+    let missionRouteLayer = null;
+    let gpsMode = null;
+    let routeUpdateInterval = null;
+
+    const gpsRouteInfo = document.getElementById('gps-route-info');
+    const routeDistanceEl = document.getElementById('route-distance');
+    const routeTimeEl = document.getElementById('route-time');
+    const gpsModeIndicator = document.getElementById('gps-mode-indicator');
+
+    function initGPSSystem() {
+        if (!map) return;
+
+        map.addSource('personal-route', {
+            type: 'geojson',
+            data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } }
+        });
+        personalRouteSource = map.getSource('personal-route');
+
+        map.addLayer({
+            id: 'personal-route-glow',
+            type: 'line',
+            source: 'personal-route',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: {
+                'line-color': '#a44cf2',
+                'line-width': 12,
+                'line-opacity': 0.4,
+                'line-blur': 4
+            }
+        });
+
+        map.addLayer({
+            id: 'personal-route-layer',
+            type: 'line',
+            source: 'personal-route',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: {
+                'line-color': '#c88aff',
+                'line-width': 6,
+                'line-opacity': 1
+            }
+        });
+        personalRouteLayer = map.getLayer('personal-route-layer');
+
+        map.addSource('mission-route', {
+            type: 'geojson',
+            data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] } }
+        });
+        missionRouteSource = map.getSource('mission-route');
+
+        map.addLayer({
+            id: 'mission-route-glow',
+            type: 'line',
+            source: 'mission-route',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: {
+                'line-color': '#efc74f',
+                'line-width': 12,
+                'line-opacity': 0.4,
+                'line-blur': 4
+            }
+        });
+
+        map.addLayer({
+            id: 'mission-route-layer',
+            type: 'line',
+            source: 'mission-route',
+            layout: { 'line-cap': 'round', 'line-join': 'round' },
+            paint: {
+                'line-color': '#ffe066',
+                'line-width': 6,
+                'line-opacity': 1
+            }
+        });
+        missionRouteLayer = map.getLayer('mission-route-layer');
+
+        map.on('contextmenu', (e) => {
+            e.preventDefault();
+            placePersonalWaypoint(e.lngLat.lng, e.lngLat.lat);
+        });
+
+        map.on('dblclick', (e) => {
+            e.preventDefault();
+            placeMissionMarker(e.lngLat.lng, e.lngLat.lat);
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (personalWaypoint) {
+                    removePersonalWaypoint();
+                }
+            }
+            if (e.key === 'm' || e.key === 'M') {
+                if (missionMarker) {
+                    removeMissionMarker();
+                }
+            }
+        });
+
+        routeUpdateInterval = setInterval(() => {
+            if (personalWaypoint && userPos) {
+                calculateAndDrawRoute(userPos.lng, userPos.lat, personalWaypoint.lng, personalWaypoint.lat, 'personal');
+            }
+            if (missionMarker && userPos) {
+                calculateAndDrawRoute(userPos.lng, userPos.lat, missionMarker.lng, missionMarker.lat, 'mission');
+            }
+        }, 5000);
+    }
+
+    function placePersonalWaypoint(lng, lat) {
+        if (personalWaypointMarker) {
+            personalWaypointMarker.remove();
+        }
+
+        personalWaypoint = { lng, lat };
+
+        const el = document.createElement('div');
+        el.className = 'waypoint-blip';
+        const icon = document.createElement('div');
+        icon.className = 'blip-icon';
+        el.appendChild(icon);
+
+        personalWaypointMarker = new maplibregl.Marker({
+            element: el,
+            anchor: 'center',
+            rotationAlignment: 'viewport',
+            pitchAlignment: 'viewport'
+        }).setLngLat([lng, lat]).addTo(map);
+
+        showGPSMode('waypoint');
+        calculateAndDrawRoute(userPos.lng, userPos.lat, lng, lat, 'personal');
+        showRadioToast('WAYPOINT SET');
+    }
+
+    function removePersonalWaypoint() {
+        if (personalWaypointMarker) {
+            personalWaypointMarker.remove();
+            personalWaypointMarker = null;
+        }
+        personalWaypoint = null;
+        if (personalRouteSource) {
+            personalRouteSource.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: [] } });
+        }
+        hideGPSRouteInfo();
+        showRadioToast('WAYPOINT REMOVED');
+    }
+
+    function placeMissionMarker(lng, lat) {
+        if (missionMarkerEl) {
+            missionMarkerEl.remove();
+        }
+
+        missionMarker = { lng, lat };
+
+        const el = document.createElement('div');
+        el.className = 'mission-blip';
+        const icon = document.createElement('div');
+        icon.className = 'blip-icon';
+        el.appendChild(icon);
+
+        missionMarkerEl = new maplibregl.Marker({
+            element: el,
+            anchor: 'center',
+            rotationAlignment: 'viewport',
+            pitchAlignment: 'viewport'
+        }).setLngLat([lng, lat]).addTo(map);
+
+        showGPSMode('mission');
+        calculateAndDrawRoute(userPos.lng, userPos.lat, lng, lat, 'mission');
+        showRadioToast('MISSION MARKER SET');
+
+        broadcastMissionMarker();
+    }
+
+    function removeMissionMarker() {
+        if (missionMarkerEl) {
+            missionMarkerEl.remove();
+            missionMarkerEl = null;
+        }
+        missionMarker = null;
+        if (missionRouteSource) {
+            missionRouteSource.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: [] } });
+        }
+        hideGPSRouteInfo();
+        showRadioToast('MISSION MARKER REMOVED');
+
+        broadcastMissionMarker();
+    }
+
+    function broadcastMissionMarker() {
+        if (!currentPeer) return;
+
+        const missionData = {
+            type: 'MISSION_UPDATE',
+            sessionId: mySessionId,
+            mission: missionMarker ? { lng: missionMarker.lng, lat: missionMarker.lat } : null
+        };
+
+        if (hubConnection && hubConnection.open) {
+            hubConnection.send(missionData);
+        } else if (connections && connections.length > 0) {
+            connections.forEach(c => {
+                if (c.open) c.send(missionData);
+            });
+        }
+    }
+
+    function handleMissionUpdate(data) {
+        if (data.sessionId === mySessionId) return;
+
+        if (data.mission) {
+            if (missionMarkerEl) {
+                missionMarkerEl.setLngLat([data.mission.lng, data.mission.lat]);
+            } else {
+                const el = document.createElement('div');
+                el.className = 'mission-blip';
+                const icon = document.createElement('div');
+                icon.className = 'blip-icon';
+                el.appendChild(icon);
+
+                missionMarkerEl = new maplibregl.Marker({
+                    element: el,
+                    anchor: 'center',
+                    rotationAlignment: 'viewport',
+                    pitchAlignment: 'viewport'
+                }).setLngLat([data.mission.lng, data.mission.lat]).addTo(map);
+            }
+            missionMarker = data.mission;
+            calculateAndDrawRoute(userPos.lng, userPos.lat, data.mission.lng, data.mission.lat, 'mission');
+        } else {
+            if (missionMarkerEl) {
+                missionMarkerEl.remove();
+                missionMarkerEl = null;
+            }
+            missionMarker = null;
+            if (missionRouteSource) {
+                missionRouteSource.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: [] } });
+            }
+        }
+    }
+
+    async function calculateAndDrawRoute(fromLng, fromLat, toLng, toLat, type) {
+        try {
+            const url = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) {
+                console.warn('OSRM routing failed:', data.code);
+                return;
+            }
+
+            const route = data.routes[0];
+            const coordinates = route.geometry.coordinates;
+
+            if (type === 'personal' && personalRouteSource) {
+                personalRouteSource.setData({
+                    type: 'Feature',
+                    geometry: { type: 'LineString', coordinates }
+                });
+            } else if (type === 'mission' && missionRouteSource) {
+                missionRouteSource.setData({
+                    type: 'Feature',
+                    geometry: { type: 'LineString', coordinates }
+                });
+            }
+
+            const distanceKm = (route.distance / 1000).toFixed(1);
+            const durationMin = Math.round(route.duration / 60);
+
+            showGPSRouteInfo(distanceKm, durationMin, type);
+
+        } catch (error) {
+            console.error('Route calculation error:', error);
+        }
+    }
+
+    function showGPSRouteInfo(distance, time, type) {
+        if (!gpsRouteInfo || !routeDistanceEl || !routeTimeEl) return;
+
+        routeDistanceEl.textContent = `${distance} km`;
+        routeTimeEl.textContent = `${time} min`;
+
+        gpsRouteInfo.style.setProperty('--gps-color', type === 'personal' ? '#a44cf2' : '#efc74f');
+        gpsRouteInfo.classList.add('visible');
+    }
+
+    function hideGPSRouteInfo() {
+        if (gpsRouteInfo) {
+            gpsRouteInfo.classList.remove('visible');
+        }
+    }
+
+    function showGPSMode(mode) {
+        if (!gpsModeIndicator) return;
+
+        gpsMode = mode;
+        gpsModeIndicator.textContent = mode === 'waypoint' ? 'GPS: WAYPOINT' : 'GPS: MISSION';
+        gpsModeIndicator.className = 'gps-mode-indicator visible ' + (mode === 'waypoint' ? 'waypoint-mode' : 'mission-mode');
+
+        setTimeout(() => {
+            gpsModeIndicator.classList.remove('visible');
+        }, 3000);
+    }
+
+    if (map) {
+        if (map.loaded()) {
+            initGPSSystem();
+        } else {
+            map.on('load', initGPSSystem);
+        }
     }
 });
