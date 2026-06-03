@@ -320,7 +320,8 @@ document.addEventListener('DOMContentLoaded', () => {
         style: styleUrl,
         center: [-0.09, 51.505], // Default London
         zoom: 13,
-        attributionControl: false
+        attributionControl: false,
+        doubleClickZoom: false
     });
 
     map.on('load', () => {
@@ -407,9 +408,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Always update lastMapPos with current GPS position
             lastMapPos = { lat, lng };
 
-            // Follow mode for self
+            // Follow mode for self - only update if user explicitly enabled it
             if (followTarget === 'self') {
-                map.flyTo({ center: [lng, lat], essential: true });
+                map.flyTo({ center: [lng, lat], essential: true, duration: 0 });
             }
 
             // Update Coordinates Display
@@ -1855,6 +1856,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 calculateAndDrawRoute(userPos.lng, userPos.lat, missionMarker.lng, missionMarker.lat, 'mission');
             }
         }, 5000);
+        
+        // GPS button event listeners
+        document.getElementById('place-waypoint-btn')?.addEventListener('click', () => {
+            // Place waypoint at current player position
+            if (userPos) {
+                placePersonalWaypoint(userPos.lng, userPos.lat);
+                showRadioToast('WAYPOINT SET AT PLAYER');
+            } else {
+                showRadioToast('WAITING FOR GPS...');
+            }
+        });
+        
+        document.getElementById('place-mission-btn')?.addEventListener('click', () => {
+            // Place mission marker at current player position
+            if (userPos) {
+                placeMissionMarker(userPos.lng, userPos.lat);
+                showRadioToast('MISSION SET AT PLAYER');
+            } else {
+                showRadioToast('WAITING FOR GPS...');
+            }
+        });
     }
 
     function placePersonalWaypoint(lng, lat) {
@@ -1872,7 +1894,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         personalWaypointMarker = new maplibregl.Marker({
             element: el,
-            anchor: 'center',
+            anchor: 'bottom',
             rotationAlignment: 'viewport',
             pitchAlignment: 'viewport'
         }).setLngLat([lng, lat]).addTo(map);
@@ -1910,7 +1932,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         missionMarkerEl = new maplibregl.Marker({
             element: el,
-            anchor: 'center',
+            anchor: 'bottom',
             rotationAlignment: 'viewport',
             pitchAlignment: 'viewport'
         }).setLngLat([lng, lat]).addTo(map);

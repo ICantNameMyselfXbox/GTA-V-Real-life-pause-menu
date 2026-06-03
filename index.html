@@ -188,14 +188,26 @@
         <div id="radio-streams-container" style="display: none;"></div>
         <div id="radio-toast" class="radio-toast"></div>
 
+        <!-- Crosshair for precise placement -->
+        <div id="map-crosshair" class="map-crosshair">
+            <div class="crosshair-line top"></div>
+            <div class="crosshair-line bottom"></div>
+            <div class="crosshair-line left"></div>
+            <div class="crosshair-line right"></div>
+        </div>
+
         <footer class="menu-footer">
             <div class="footer-left">
                 <div class="key-hint"><span class="key">ESC</span> BACK</div>
                 <div class="key-hint"><span class="key">↵</span> SELECT</div>
             </div>
+            <div class="footer-center">
+                <button id="place-waypoint-btn" class="gps-button">PLACE WAYPOINT</button>
+                <button id="place-mission-btn" class="gps-button">PLACE MISSION</button>
+            </div>
             <div class="footer-right">
-                <div class="key-hint"><span class="key">←→</span> NAVIGATE</div>
-                <div class="key-hint"><span class="key">TAB</span> SWITCH</div>
+                <div class="key-hint"><span class="key">Delete</span> REMOVE WAYPOINT</div>
+                <div class="key-hint"><span class="key">M</span> REMOVE MISSION</div>
             </div>
         </footer>
     </div>

@@ -527,10 +527,10 @@ body {
 
 .waypoint-blip .blip-icon {
     position: absolute;
-    top: calc(var(--current-blip-size) * -0.75);
-    left: calc(var(--current-blip-size) / -2);
-    width: var(--current-blip-size);
-    height: calc(var(--current-blip-size) * 1.5);
+    top: calc(var(--current-blip-size) * -1.8);
+    left: calc(var(--current-blip-size) * -0.6);
+    width: calc(var(--current-blip-size) * 1.2);
+    height: calc(var(--current-blip-size) * 1.8);
     background-image: url('Blips/radar_waypoint.png');
     background-size: contain;
     background-position: center;
@@ -555,7 +555,7 @@ body {
 
 .mission-blip .blip-icon {
     position: absolute;
-    top: calc(var(--current-blip-size) * -0.6);
+    top: calc(var(--current-blip-size) * -1.2);
     left: calc(var(--current-blip-size) / -2);
     width: var(--current-blip-size);
     height: calc(var(--current-blip-size) * 1.2);
@@ -1108,6 +1108,182 @@ body {
     letter-spacing: 1px;
     font-weight: bold;
     text-transform: uppercase;
+}
+
+/* Map Crosshair for precise placement - GTA V Style */
+.map-crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    pointer-events: none;
+    z-index: 1000;
+    transform: translate(-50%, -50%);
+}
+
+/* Top line */
+.crosshair-line.top {
+    position: absolute;
+    width: 2px;
+    height: 8px;
+    background: #fff;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Bottom line */
+.crosshair-line.bottom {
+    position: absolute;
+    width: 2px;
+    height: 8px;
+    background: #fff;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Left line */
+.crosshair-line.left {
+    position: absolute;
+    width: 8px;
+    height: 2px;
+    background: #fff;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Right line */
+.crosshair-line.right {
+    position: absolute;
+    width: 8px;
+    height: 2px;
+    background: #fff;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    box-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Hide the old pseudo-elements */
+.map-crosshair::before,
+.map-crosshair::after {
+    display: none;
+}
+.map-crosshair::before,
+.map-crosshair::after {
+    display: none;
+}
+
+/* Menu Footer */
+.menu-footer {
+    height: 50px;
+    background: rgba(0, 0, 0, 0.6);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 40px;
+    gap: 25px;
+}
+
+.footer-left {
+    display: flex;
+    align-items: center;
+    gap: 25px;
+}
+
+.footer-center {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.footer-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.key-hint {
+    font-size: 0.85rem;
+    color: #fff;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: 0.5px;
+}
+
+.key {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* GPS Buttons */
+.gps-button {
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    color: #fff;
+    padding: 8px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.gps-button:hover {
+    background: rgba(0, 0, 0, 0.8);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.gps-button:active {
+    transform: translateY(0);
+}
+
+/* Mobile Responsiveness for Footer */
+@media (max-width: 1024px) {
+    .menu-footer {
+        flex-wrap: wrap;
+        gap: 10px;
+        padding: 8px 15px;
+    }
+    
+    .footer-left, .footer-center, .footer-right {
+        width: 100%;
+        justify-content: center;
+        margin-bottom: 5px;
+    }
+    
+    .footer-center {
+        margin-bottom: 0;
+    }
+    
+    .gps-button {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+    
+    .key-hint {
+        font-size: 12px;
+    }
+    
+    .key-hint .key {
+        padding: 1px 5px;
+        font-size: 11px;
+    }
 }
 
 /* --- MOBILE RESPONSIVENESS --- */
